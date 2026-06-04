@@ -1,6 +1,6 @@
 import random
 from datetime import datetime, timedelta
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 
 
 class MasterDataFactory:
@@ -34,6 +34,8 @@ class MasterDataFactory:
             "Broadway Gala": "Theater"
         }
 
+        self._ticket_types: List[str] = ["General Admission", "VIP Pass", "Early Bird"]
+
     @property
     def organizer_tuples(self) -> List[Tuple[str]]:
         return [(name,) for name in self._organizers]
@@ -60,9 +62,41 @@ class MasterDataFactory:
     def event_names(self) -> List[str]:
         return list(self._events.keys())
 
-    def generate_random_date(self, start_year: int = 2019, end_year: int = 2020) -> datetime:
+    @property
+    def ticket_types(self) -> List[str]:
+        return self._ticket_types
+
+    @staticmethod
+    def generate_random_date(start_year: int = 2019, end_year: int = 2020) -> datetime:
         """Calculates a randomized date within the required analytical boundary windows."""
         start_date = datetime(start_year, 1, 1)
         end_date = datetime(end_year, 12, 31)
         delta_days = (end_date - start_date).days
         return start_date + timedelta(days=random.randrange(delta_days))
+
+
+    def create_purchase_payloads(self, volume: int) -> List[Tuple]:
+        """Generates transactional row definitions matching required target fields."""
+        purchases: List[Tuple] = []
+
+        for _ in range(volume):
+            org_id = random.randint(1, len(self._organizers))
+            customer_id = random.randint(1, len(self._customers))
+
+            # 30% chance for direct organizer sales (reseller_id becomes None/NULL)
+            reseller_id: Optional[int] = None if random.random() < 0.30 else random.randint(1, len(self._resellers))
+
+            purchase_date = self.generate_random_date()
+            channel = random.choice(self._channels)
+            ticket_type = random.choice(self._ticket_types)
+            quantity = random.randint(1, 5)
+
+            base_price = random.choice([50.00, 100.00, 250.00])
+            total_amount = quantity * base_price
+
+            purchases.append((
+                org_id, reseller_id, customer_id, purchase_date,
+                channel, ticket_type, quantity, total_amount
+            ))
+
+        return purchases

@@ -5,7 +5,7 @@ import unittest
 import tempfile
 import shutil
 
-from src.utils.generator.master_data_factory import MasterDataFactory
+from src.utils.generator.master_data_registry import MasterDataFactory
 from src.utils.generator.reseller.reseller_data_generator import ResellerDataGenerator
 
 
