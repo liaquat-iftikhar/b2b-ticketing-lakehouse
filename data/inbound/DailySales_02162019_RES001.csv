@@ -1,0 +1,23 @@
+Transaction ID,Event name,Number of purchased tickets,Total amount,Sales channel,Customer first name,Customer last name,Office location,Created Date
+10005075,Rock Festival 2019,5,$600.00,mobile app,Alice,Davis,Hamburg,2019-02-16
+10005076,Tech Conference 2019,1,$75.00,web,Jane,Davis,Berlin,2019-02-16
+10005077,Championship Finals,2,$90.00,mobile app,Emma,Davis,Hamburg,2019-02-16
+10005078,Rock Festival 2019,4,$180.00,office,Bob,Davis,New York,2019-02-16
+10005079,Rock Festival 2019,3,$360.00,office,Michael,Schneider,Chicago,2019-02-16
+10005080,Rock Festival 2020,3,$225.00,office,Jane,Schneider,Seattle,2019-02-16
+10005081,Tech Conference 2019,2,$240.00,web,Emma,Müller,Hamburg,2019-02-16
+10005082,Rock Festival 2020,2,$240.00,web,Michael,Smith,New York,2019-02-16
+10005083,Rock Festival 2020,1,$45.00,mobile app,John,Smith,Hamburg,2019-02-16
+10005084,Championship Finals,4,$1000.00,office,John,Davis,Berlin,2019-02-16
+10005085,Tech Conference 2019,2,$240.00,web,Emma,Davis,New York,2019-02-16
+10005086,Rock Festival 2019,3,$135.00,mobile app,John,Smith,Chicago,2019-02-16
+10005087,Tech Conference 2019,3,$360.00,web,John,Davis,Seattle,2019-02-16
+10005088,Championship Finals,1,$75.00,mobile app,Emma,Smith,Seattle,2019-02-16
+10005089,Tech Conference 2020,3,$750.00,web,Alice,Schneider,New York,2019-02-16
+10005090,Broadway Gala,3,$135.00,mobile app,Michael,Schneider,New York,2019-02-16
+10005091,Rock Festival 2019,4,$300.00,web,Jane,Smith,Hamburg,2019-02-16
+10005092,Rock Festival 2020,5,$375.00,web,John,Smith,Chicago,2019-02-16
+10005093,Rock Festival 2019,2,$150.00,mobile app,Bob,Doe,Berlin,2019-02-16
+10005094,Championship Finals,1,$120.00,office,Emma,Smith,Berlin,2019-02-16
+10005095,Corrupted Concert,1,-$50.00,web,Bad,Data,Berlin,2019-02-16
+10005096,Empty Event,0,$0.00,mobile app,Ghost,Buyer,Seattle,2019-02-16
