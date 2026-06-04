@@ -1,32 +1,28 @@
+import logging
 import random
+
 from datetime import datetime, timedelta
-from typing import List, Tuple, Dict, Any, Optional
+from typing import Dict, List, Tuple
+
+from src.utils.generator.model.customer import Customer
+from src.utils.generator.model.reseller import Reseller
+
+logger = logging.getLogger(__name__)
 
 
-class MasterDataFactory:
+class MasterDataRegistry:
     """
     The Single Source of Truth for all mock enterprise dimensions. Feeds uniform data structures to data generator.
     """
 
     def __init__(self) -> None:
-        # Master Dimensions
-        self._organizers: List[str] = ["Grand Arena Productions", "Echo Stage Group", "Summit Tech Foundations"]
-        self._channels: List[str] = ["web", "app", "on-the-site"]
-
-        # Resellers mapped with IDs, commission rates, and operational regions
-        self._resellers: Dict[str, Dict[str, Any]] = {
-            "RES001": {"name": "TicketMastery Premium", "rate": 0.12, "region": "Europe-Central"},
-            "RES002": {"name": "PassGateway Global", "rate": 0.10, "region": "US-East"},
-            "RES003": {"name": "LocalVibe Events", "rate": 0.08, "region": "Europe-West"}
-        }
-
-        self._customers: List[Tuple[str, str]] = [
-            ("Sarah Jenkins", "sarah.j@example.com"),
-            ("Michael Müller", "m.mueller@example.de"),
-            ("David Chang", "dchang@example.com")
+        logger.debug("Initializing MasterDataRegistry")
+        self._organizers: List[str] = [
+            "Grand Arena Productions", "Echo Stage Group", "Summit Tech Foundations"
         ]
+        self._channels: List[str] = ["web", "app", "on-the-site"]
+        self._ticket_types: List[str] = ["General Admission", "VIP Pass", "Early Bird"]
 
-        # Event matrix mapping names to types
         self._events: Dict[str, str] = {
             "Rock Festival 2019": "Concert",
             "Rock Festival 2020": "Concert",
@@ -34,16 +30,33 @@ class MasterDataFactory:
             "Broadway Gala": "Theater"
         }
 
-        self._ticket_types: List[str] = ["General Admission", "VIP Pass", "Early Bird"]
+        self._resellers: Dict[str, Reseller] = {
+            "RES001": Reseller("RES001", "TicketMastery Premium", 0.12, "Europe-Central"),
+            "RES002": Reseller("RES002", "PassGateway Global", 0.10, "US-East"),
+            "RES003": Reseller("RES003", "LocalVibe Events", 0.08, "Europe-West")
+        }
+
+        self._customers: List[Customer] = [
+            Customer("Sarah Jenkins", "sarah.j@example.com"),
+            Customer("Michael Müller", "m.mueller@example.de"),
+            Customer("David Chang", "dchang@example.com")
+        ]
+
+    @property
+    def organizers(self) -> List[str]:
+        return self._organizers
 
     @property
     def organizer_tuples(self) -> List[Tuple[str]]:
         return [(name,) for name in self._organizers]
 
     @property
+    def resellers(self) -> Dict[str, Reseller]:
+        return self._resellers
+
+    @property
     def reseller_tuples(self) -> List[Tuple[str, float, str]]:
-        """Formats resellers for relational database insertions."""
-        return [(data["name"], data["rate"], data["region"]) for data in self._resellers.values()]
+        return [reseller.to_relational_tuple() for reseller in self._resellers.values()]
 
     @property
     def reseller_ids(self) -> List[str]:
@@ -51,8 +64,12 @@ class MasterDataFactory:
         return list(self._resellers.keys())
 
     @property
-    def customer_tuples(self) -> List[Tuple[str, str]]:
+    def customers(self) -> List[Customer]:
         return self._customers
+
+    @property
+    def customer_tuples(self) -> List[Tuple[str, str]]:
+        return [customer.to_tuple() for customer in self._customers]
 
     @property
     def channels(self) -> List[str]:
@@ -67,36 +84,10 @@ class MasterDataFactory:
         return self._ticket_types
 
     @staticmethod
-    def generate_random_date(start_year: int = 2019, end_year: int = 2020) -> datetime:
-        """Calculates a randomized date within the required analytical boundary windows."""
+    def generate_random_date(start_year: int = 2019, end_year: int = 2020) -> datetime.date:
+        """Calculates a randomized date within specified boundary windows."""
+        logger.debug("Generating random date between %d and %d", start_year, end_year)
         start_date = datetime(start_year, 1, 1)
         end_date = datetime(end_year, 12, 31)
         delta_days = (end_date - start_date).days
-        return start_date + timedelta(days=random.randrange(delta_days))
-
-
-    def create_purchase_payloads(self, volume: int) -> List[Tuple]:
-        """Generates transactional row definitions matching required target fields."""
-        purchases: List[Tuple] = []
-
-        for _ in range(volume):
-            org_id = random.randint(1, len(self._organizers))
-            customer_id = random.randint(1, len(self._customers))
-
-            # 30% chance for direct organizer sales (reseller_id becomes None/NULL)
-            reseller_id: Optional[int] = None if random.random() < 0.30 else random.randint(1, len(self._resellers))
-
-            purchase_date = self.generate_random_date()
-            channel = random.choice(self._channels)
-            ticket_type = random.choice(self._ticket_types)
-            quantity = random.randint(1, 5)
-
-            base_price = random.choice([50.00, 100.00, 250.00])
-            total_amount = quantity * base_price
-
-            purchases.append((
-                org_id, reseller_id, customer_id, purchase_date,
-                channel, ticket_type, quantity, total_amount
-            ))
-
-        return purchases
+        return (start_date + timedelta(days=random.randrange(delta_days))).date()

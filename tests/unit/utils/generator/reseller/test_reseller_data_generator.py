@@ -5,7 +5,7 @@ import unittest
 import tempfile
 import shutil
 
-from src.utils.generator.master_data_registry import MasterDataFactory
+from src.utils.generator.master_data_registry import MasterDataRegistry
 from src.utils.generator.reseller.reseller_data_generator import ResellerDataGenerator
 
 
@@ -17,7 +17,7 @@ class TestResellerDataGenerator(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
 
         # 2. Instantiate and inject dependencies cleanly
-        self.factory = MasterDataFactory()
+        self.factory = MasterDataRegistry()
         self.generator = ResellerDataGenerator(data_factory=self.factory, target_dir=self.test_dir)
 
     def tearDown(self):
