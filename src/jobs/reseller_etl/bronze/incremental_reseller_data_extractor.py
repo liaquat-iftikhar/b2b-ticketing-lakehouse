@@ -30,7 +30,8 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
         StructField("Created Date", StringType(), True)
     ])
 
-    def __init__(self, source_path: str, execution_date: str, target_base_path: Optional[str] = None) -> None:
+    def __init__(self, source_path: str, execution_date: str, target_base_path: Optional[str] = None,
+                 etl_name: str = "reseller_etl") -> None:
         """
         Initializes the concrete pipeline extractor and bubbles configurations up
         to the BaseDataPipeline control layer.
@@ -41,7 +42,7 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
         super().__init__(
             execution_date=execution_date,
             layer=Constants.LAYERS.BRONZE,
-            etl_name="reseller_etl",
+            etl_name=etl_name,
             custom_base_path=target_base_path
         )
 
