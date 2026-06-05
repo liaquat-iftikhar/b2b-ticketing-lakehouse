@@ -119,7 +119,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lakehouse_base_path",
         default=None,
-        help="Target base directory. Supports local system paths or s3a:// bucket URIs."
+        help="Base directory for lakehouse. Supports local system paths or s3a:// bucket URIs."
     )
     args = parser.parse_args()
 

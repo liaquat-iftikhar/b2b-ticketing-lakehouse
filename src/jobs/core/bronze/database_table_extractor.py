@@ -23,7 +23,7 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
             execution_date: str,
             connection_manager: DBConnectionManager,
             partition_config: Optional[JDBCPartitionConfig] = None,
-            target_base_path: Optional[str] = None
+            lakehouse_base_path: Optional[str] = None
     ) -> None:
 
         self.db_table = db_table
@@ -38,8 +38,8 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
         super().__init__(
             execution_date=execution_date,
             layer=Constants.LAYERS.BRONZE,
-            etl_name=f"db_ingest_{db_table.lower()}",
-            custom_base_path=target_base_path
+            etl_name=f"{db_table.lower()}_etl",
+            lakehouse_base_path=lakehouse_base_path
         )
 
     def _extract(self) -> DataFrame:
@@ -96,17 +96,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Relational Database Medallion Bronze Ingestion Job")
     parser.add_argument("--table", required=True, help="Target relational database source table name string.")
     parser.add_argument("--execution_date", required=True, help="Logical date execution block (YYYY-MM-DD)")
+    parser.add_argument("--lakehouse_base_path", required=True, help="Base directory for lakehouse. Supports local system paths or s3a:// bucket URIs.")
 
     # Explicit connection parameters exposed to CLI for ad-hoc manual testing runs
-    parser.add_argument("--jdbc_url", required=True, help="The complete JDBC target destination host URI string.")
+    parser.add_argument("--db_host", required=True, help="The host URI string.")
     parser.add_argument("--db_user", required=True, help="Authorized username credential identifier.")
     parser.add_argument("--db_password", required=True, help="Authorized execution security secret token.")
+    parser.add_argument("--db_port", required=True, help="Port to connect to database.")
     parser.add_argument("--db_driver", default="org.postgresql.Driver",
                         help="Java target execution class connector driver.")
     args = parser.parse_args()
 
+    os.environ["DB_HOST"] = args.db_host
+    os.environ["DB_PORT"] = args.db_port
     os.environ["DB_USER"] = args.db_user
     os.environ["DB_PASSWORD"] = args.db_password
+    os.environ["DB_DRIVER"] = args.db_driver
     os.environ["DB_DRIVER"] = args.db_driver
 
     conn_manager = DBConnectionManager()
@@ -122,6 +127,7 @@ if __name__ == "__main__":
         db_table=args.table,
         execution_date=args.execution_date,
         connection_manager=conn_manager,
-        partition_config=tuning_strategy
+        partition_config=tuning_strategy,
+        lakehouse_base_path=args.lakehouse_base_path
     )
     extractor.execute()

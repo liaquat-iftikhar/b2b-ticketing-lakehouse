@@ -5,7 +5,7 @@ from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 
-from common.datasets import RESELLER_ETL_SUCCESS_DATASET
+from common.datasets import RESELLER_DATA_EXTRACTOR_DAG_SUCCESS_DATASET
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SPARK_CONN_ID = "spark_local"
@@ -26,7 +26,7 @@ default_args = {
 with DAG(
         dag_id="reseller_data_extractor_dag",
         default_args=default_args,
-        description="Orchestrates End-to-End Database and File Ingestion from Operational layers to Silver Delta",
+        description="Extract reseller data",
         schedule="@daily",
         start_date=datetime(2026, 6, 1),
         catchup=False,
@@ -63,7 +63,7 @@ with DAG(
             "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
             "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog"
         },
-        outlets=[RESELLER_ETL_SUCCESS_DATASET],
+        outlets=[RESELLER_DATA_EXTRACTOR_DAG_SUCCESS_DATASET],
         application_args=[
             "--execution_date", "{{ ds }}",
             "--lakehouse_base_path", str(LAKEHOUSE_PATH)
