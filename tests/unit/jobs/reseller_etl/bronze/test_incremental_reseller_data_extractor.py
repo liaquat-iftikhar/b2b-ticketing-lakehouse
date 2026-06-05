@@ -135,7 +135,7 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         extractor._load(df_clean=mock_df_clean, df_quarantine=None)
 
         # Assert
-        mock_writer.format.assert_called_once_with("parquet")
+        mock_writer.format.assert_called_once_with("delta")
         mock_writer.outputMode.assert_called_once_with("append")
         mock_writer.option.assert_called_once_with("checkpointLocation", extractor.lakehouse_paths.checkpoint_dir)
         mock_writer.start.assert_called_once_with(extractor.lakehouse_paths.target_dir)
