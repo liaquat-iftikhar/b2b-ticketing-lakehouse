@@ -13,7 +13,7 @@ from src.jobs.common.lakehouse_path_resolver import LakehousePathResolver
 from src.jobs.core.base_data_pipeline import BaseDataPipeline
 
 
-class BronzeToSilverTransformer(BaseDataPipeline):
+class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
     """
     Incremental batch pipeline to move Reseller data from Bronze Delta to Silver Delta.
     Handles schema mapping, data cleansing, validation filters, and idempotent deduplication.
@@ -70,7 +70,7 @@ class BronzeToSilverTransformer(BaseDataPipeline):
             .withColumn("office_location", F.col("Office_location"))
             .withColumn("customer_first_name", F.col("Customer_first_name"))
             .withColumn("customer_last_name", F.col("Customer_last_name"))
-            .withColumn("log_date", F.col("Created_Date"))
+            .withColumn("created_date", F.col("Created_Date"))
         )
 
         # Isolate Type-Cast Failures
@@ -115,7 +115,7 @@ class BronzeToSilverTransformer(BaseDataPipeline):
             .dropDuplicates(["transaction_id", "reseller_id"])
             .select(
                 "transaction_id", "reseller_id", "event_name", "tickets_count", "net_revenue", "sales_channel", "office_location",
-                "customer_first_name", "customer_last_name", "log_date"
+                "customer_first_name", "customer_last_name", "created_date"
             )
             .withColumn("silver_inserted_at", F.current_timestamp())
         )
@@ -133,9 +133,12 @@ class BronzeToSilverTransformer(BaseDataPipeline):
                 self.logger.info("Performing row-level Delta MERGE into Silver target: %s", silver_dir)
                 silver_table = DeltaTable.forPath(self.spark, silver_dir)
 
+                merge_condition = "target.transaction_id = source.transaction_id"
+                merge_condition += " AND target.reseller_id = source.reseller_id"
+
                 (
                     silver_table.alias("target")
-                    .merge(df_clean.alias("source"), "target.transaction_id = source.transaction_id")
+                    .merge(df_clean.alias("source"), merge_condition )
                     .whenMatchedUpdateAll()
                     .whenNotMatchedInsertAll()
                     .execute()
@@ -146,7 +149,7 @@ class BronzeToSilverTransformer(BaseDataPipeline):
                     df_clean.write
                     .format("delta")
                     .mode("overwrite")
-                    .partitionBy("log_date")
+                    .partitionBy("created_date")
                     .save(silver_dir)
                 )
         else:
@@ -172,7 +175,7 @@ if __name__ == "__main__":
     parser.add_argument("--target_base_path", default=None, help="Overriding base target directory path URI string.")
     args = parser.parse_args()
 
-    transformer = BronzeToSilverTransformer(
+    transformer = ResellerDataBronzeToSilverTransformer(
         execution_date=args.execution_date,
         etl_name=args.etl_name,
         custom_base_path=args.target_base_path
