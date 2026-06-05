@@ -18,7 +18,7 @@ class ResellerDataGenerator:
     def __init__(self, data_factory: MasterDataRegistry, target_dir: str = None) -> None:
         self.factory = data_factory
 
-        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
         self.target_dir = target_dir or str(project_root / "data" / "inbound")
 
         self.current_tx_id = 10005000

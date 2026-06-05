@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
+from pyspark.sql import DataFrame
 
 from src.jobs.common.lakehouse_path_resolver import LakehousePathResolver
 from src.jobs.common.spark_session_builder import SparkSessionFactory
@@ -8,8 +9,9 @@ from src.jobs.common.spark_session_builder import SparkSessionFactory
 
 class BaseDataPipeline(ABC):
     """
-    Abstract Base Class establishing the definitive ETL template lifecycle. Manages Spark context initialization,
-    automatic path determination, and reliable compute resource teardowns.
+    Abstract Base Class establishing the definitive ETL template lifecycle.
+    Manages Spark context initialization, automatic path determination,
+    and reliable compute resource teardowns.
     """
 
     def __init__(
@@ -26,25 +28,28 @@ class BaseDataPipeline(ABC):
         self.custom_base_path = custom_base_path
         self.extra_configs = extra_configs or {}
         self.spark = None
-        self.logger = logging.getLogger(__name__)
 
-        # Automatically resolve storage boundaries using central path utility
-        self.target_dir, self.checkpoint_dir = LakehousePathResolver(custom_base_path=self.custom_base_path).resolve(
-            layer=self.layer, etl_name=self.etl_name,
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+        self.lakehouse_paths = LakehousePathResolver(
+            custom_base_path=self.custom_base_path
+        ).resolve(
+            layer=self.layer,
+            etl_name=self.etl_name,
         )
 
     @abstractmethod
-    def _extract(self):
+    def _extract(self) -> DataFrame:
         """Extracts raw datasets from the preceding Medallion layer."""
         pass
 
     @abstractmethod
-    def _transform(self, df):
+    def _transform(self, df: DataFrame) -> Tuple[DataFrame, Optional[DataFrame]]:
         """Applies business transformation, cleansing, and quarantine filtering rules."""
         pass
 
     @abstractmethod
-    def _load(self, df_clean, df_quarantine):
+    def _load(self, df_clean: DataFrame, df_quarantine: Optional[DataFrame]) -> None:
         """Commits pristine data records and outcasts to their target storage layers."""
         pass
 
@@ -59,7 +64,7 @@ class BaseDataPipeline(ABC):
         # 1. Initialize configuration context via the factory instance
         factory = SparkSessionFactory(
             app_name=app_name,
-            target_dir=self.target_dir,
+            target_dir=self.lakehouse_paths.target_dir,
             extra_configs=self.extra_configs
         )
 
@@ -72,8 +77,8 @@ class BaseDataPipeline(ABC):
             clean_data, quarantined_data = self._transform(raw_data)
             self._load(clean_data, quarantined_data)
 
-            self.logger.info("Successfully completed extraction workflow loop for execution partition: %s",
-                        self.execution_date)
+            self.logger.info("Successfully completed workflow loop for execution partition: %s",
+                             self.execution_date)
 
         except Exception as exc:
             self.logger.critical("Fatal failure caught during master pipeline run sequence: %s", exc, exc_info=True)
