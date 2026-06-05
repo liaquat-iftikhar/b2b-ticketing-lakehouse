@@ -24,7 +24,7 @@ default_args = {
 }
 
 with DAG(
-        dag_id="reseller_extractor_dag",
+        dag_id="reseller_data_extractor_dag",
         default_args=default_args,
         description="Orchestrates End-to-End Database and File Ingestion from Operational layers to Silver Delta",
         schedule="@daily",
