@@ -45,7 +45,6 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
 
     def _extract(self) -> DataFrame:
         """Binds a Structured Streaming DataFrame to the inbound source raw file path."""
-
         if not self.source_path.startswith("s3a://") and not os.path.exists(self.source_path):
             raise FileNotFoundError(f"Configured localized landing zone path '{self.source_path}' does not exist.")
 
@@ -58,10 +57,9 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
             .load(self.source_path)
         )
 
-
     def _transform(self, df: DataFrame) -> Tuple[DataFrame, Optional[DataFrame]]:
-        """Applies ingestion enrichment and sanitizes raw column spaces."""
-        self.logger.info("Enriching landing data payloads by scrubbing column space with - ...")
+        """Applies ingestion enrichment, sanitizes raw column spaces, and extracts reseller IDs."""
+        self.logger.info("Enriching landing data payloads by scrubbing column spaces and parsing file origins...")
 
         sanitized_cols = [
             F.col(f"`{col_name}`").alias(col_name.replace(" ", "_"))
@@ -69,10 +67,17 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
         ]
         sanitized_df = df.select(*sanitized_cols)
 
-        enriched_stream_df = sanitized_df.withColumn("input_file_name", F.input_file_name())
+        file_path_uri = F.input_file_name()
+
+        reseller_id_regex = r"DailySales_[^_]+_([^.]+)"
+
+        enriched_stream_df = (
+            sanitized_df
+            .withColumn("input_file_name", file_path_uri)
+            .withColumn("reseller_id", F.regexp_extract(file_path_uri, reseller_id_regex, 1))
+        )
 
         return enriched_stream_df, None
-
 
     def _load(self, df_clean: DataFrame, df_quarantine: Optional[DataFrame] = None) -> None:
         """Executes the stateful stream query writer targeting a Delta Lake destination table."""
@@ -91,7 +96,6 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
         )
 
         query.awaitTermination()
-
         self.logger.info("Successfully completed file extraction migration from inbound to bronze delta table.")
 
 
@@ -107,7 +111,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--execution_date",
-        default="2026-06-05",  # Defaults to active execution timeline anchor
+        default="2026-06-05",
         help="Processing logic state context day partition (Format: YYYY-MM-DD)."
     )
     parser.add_argument(

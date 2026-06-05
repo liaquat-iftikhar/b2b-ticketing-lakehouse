@@ -106,7 +106,7 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         self.assertIsNone(quarantine_df)
 
         # Verify schema preservation
-        self.assertEqual(len(clean_df.columns), len(extractor.DATA_CONTRACT_SCHEMA.names) + 1)
+        self.assertEqual(len(clean_df.columns), len(extractor.DATA_CONTRACT_SCHEMA.names) + 2)
 
     @patch("src.jobs.core.base_data_pipeline.SparkSessionFactory")
     def test_load_starts_and_terminates_streaming_query(self, mock_spark_factory) -> None:
