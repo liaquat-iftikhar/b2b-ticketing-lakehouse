@@ -70,8 +70,9 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
 
         enriched_df = (
             df
-            .withColumn("_dl_bronze_inserted_at", F.current_timestamp())
-            .withColumn("_dl_bronze_source_database_table", F.lit(self.db_table))
+            .withColumn("lh_bronze_execution_date", F.to_date(F.lit(self.execution_date)))
+            .withColumn("lh_bronze_inserted_timestamp", F.current_timestamp())
+            .withColumn("lh_bronze_source_database_table", F.lit(self.db_table))
         )
 
         return enriched_df, None
