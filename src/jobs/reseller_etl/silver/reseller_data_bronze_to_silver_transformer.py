@@ -20,16 +20,16 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
     """
 
     def __init__(self, execution_date: str, etl_name: str = "reseller_etl",
-                 custom_base_path: Optional[str] = None) -> None:
+                 lakehouse_base_path: Optional[str] = None) -> None:
         super().__init__(
             execution_date=execution_date,
             layer=Constants.LAYERS.SILVER,
             etl_name=etl_name,
-            custom_base_path=custom_base_path
+            lakehouse_base_path=lakehouse_base_path
         )
 
         # Resolve upstream Bronze Delta table coordinates
-        self.bronze_paths = LakehousePathResolver(custom_base_path=custom_base_path).resolve(
+        self.bronze_paths = LakehousePathResolver(lakehouse_base_path=lakehouse_base_path).resolve(
             layer=Constants.LAYERS.BRONZE,
             etl_name=etl_name
         )
@@ -172,13 +172,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Medallion Bronze-to-Silver Incremental Transform Pipeline")
     parser.add_argument("--execution_date", required=True, help="Processing date slice token (Format: YYYY-MM-DD)")
     parser.add_argument("--etl_name", default="reseller_etl", help="Target identity scope for lakehouse data folders.")
-    parser.add_argument("--target_base_path", default=None, help="Overriding base target directory path URI string.")
+    parser.add_argument("--lakehouse_base_path", default=None, help="Overriding base target directory path URI string.")
     args = parser.parse_args()
 
     transformer = ResellerDataBronzeToSilverTransformer(
         execution_date=args.execution_date,
         etl_name=args.etl_name,
-        custom_base_path=args.target_base_path
+        lakehouse_base_path=args.lakehouse_base_path
     )
 
     transformer.execute()

@@ -15,18 +15,25 @@ class LakehousePaths:
 class LakehousePathResolver:
     """
     A path resolution manager that maps Medallion architecture layers, quarantine buckets, and ETL contexts to
-    structured storage paths.
+    structured storage paths, integrating smoothly with Airflow-passed base directories.
     """
 
-    def __init__(self, custom_base_path: Optional[str] = None) -> None:
-        self.custom_base_path = custom_base_path
+    def __init__(self, lakehouse_base_path: Optional[str] = None) -> None:
+        self.lakehouse_base_path = lakehouse_base_path
         self.logger = logging.getLogger(__name__)
 
     def _determine_base_directory(self, etl_name: str) -> str:
-        if self.custom_base_path:
-            return self.custom_base_path
-        project_root = Path(__file__).resolve().parent.parent.parent.parent
-        return str(project_root / "data" / "lakehouse" / etl_name)
+        """Determines the root directory anchor, always appending the functional ETL domain name."""
+        if self.lakehouse_base_path:
+            base_str = self.lakehouse_base_path.rstrip("/")
+        else:
+            project_root = Path(__file__).resolve().parents[3]
+            base_str = str(project_root / "data" / "lakehouse")
+
+        if base_str.startswith("s3a://"):
+            return f"{base_str}/{etl_name}"
+
+        return str(Path(base_str) / etl_name)
 
     def resolve(self, layer: str, etl_name: str) -> LakehousePaths:
         """
@@ -50,6 +57,7 @@ class LakehousePathResolver:
             sanitized_layer = layer.strip().lower()
             sanitized_etl = etl_name.strip().lower()
 
+            # Establishes context directory: base_path/etl_name
             base_path = self._determine_base_directory(sanitized_etl)
             checkpoint_suffix = f"{sanitized_etl}_to_{sanitized_layer}"
 
@@ -59,13 +67,16 @@ class LakehousePathResolver:
                 checkpoint_dir = f"{base_uri}/_checkpoints/{checkpoint_suffix}"
                 quarantine_dir = f"{base_uri}/quarantine/{sanitized_layer}"
             else:
+                # Generates nested directories: base_path/etl_name/layer
                 target_dir = os.path.join(base_path, sanitized_layer)
                 checkpoint_dir = os.path.join(base_path, "_checkpoints", checkpoint_suffix)
                 quarantine_dir = os.path.join(base_path, "quarantine", sanitized_layer)
 
-            self.logger.debug("Successfully compiled path layout configurations via factory schema mapper.")
+            self.logger.debug(
+                "Successfully compiled path layout configurations via factory schema mapper for %s layer.",
+                sanitized_layer
+            )
 
-            # Instantiating the clean, immutable container structure
             return LakehousePaths(
                 target_dir=target_dir,
                 checkpoint_dir=checkpoint_dir,

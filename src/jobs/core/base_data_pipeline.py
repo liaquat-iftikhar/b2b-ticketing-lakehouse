@@ -19,20 +19,20 @@ class BaseDataPipeline(ABC):
             execution_date: str,
             layer: str,
             etl_name: str,
-            custom_base_path: Optional[str] = None,
+            lakehouse_base_path: Optional[str] = None,
             extra_configs: Optional[Dict[str, str]] = None
     ) -> None:
         self.execution_date = execution_date
         self.layer = layer
         self.etl_name = etl_name
-        self.custom_base_path = custom_base_path
+        self.lakehouse_base_path = lakehouse_base_path
         self.extra_configs = extra_configs or {}
         self.spark = None
 
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.lakehouse_paths = LakehousePathResolver(
-            custom_base_path=self.custom_base_path
+            lakehouse_base_path=self.lakehouse_base_path
         ).resolve(
             layer=self.layer,
             etl_name=self.etl_name,

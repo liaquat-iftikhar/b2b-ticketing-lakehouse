@@ -30,7 +30,7 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
         StructField("Created Date", StringType(), True)
     ])
 
-    def __init__(self, source_path: str, execution_date: str, target_base_path: Optional[str] = None,
+    def __init__(self, source_path: str, execution_date: str, lakehouse_base_path: Optional[str] = None,
                  etl_name: str = "reseller_etl") -> None:
 
         self.source_path = source_path
@@ -40,7 +40,7 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
             execution_date=execution_date,
             layer=Constants.LAYERS.BRONZE,
             etl_name=etl_name,
-            custom_base_path=target_base_path
+            lakehouse_base_path=lakehouse_base_path
         )
 
     def _extract(self) -> DataFrame:
@@ -115,7 +115,7 @@ if __name__ == "__main__":
         help="Processing logic state context day partition (Format: YYYY-MM-DD)."
     )
     parser.add_argument(
-        "--target_base_path",
+        "--lakehouse_base_path",
         default=None,
         help="Target base directory. Supports local system paths or s3a:// bucket URIs."
     )
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     extractor = IncrementalResellerDataExtractor(
         source_path=args.source_path,
         execution_date=args.execution_date,
-        target_base_path=args.target_base_path
+        lakehouse_base_path=args.lakehouse_base_path
     )
 
     extractor.execute()
