@@ -2,6 +2,7 @@ import os
 import logging
 from typing import Optional, Dict
 from pyspark.sql import SparkSession
+from delta import configure_spark_with_delta_pip
 
 class SparkSessionFactory:
     """
@@ -64,6 +65,9 @@ class SparkSessionFactory:
             "spark.sql.adaptive.enabled": "true",
             "spark.sql.adaptive.coalescePartitions.enabled": "true",
             "spark.sql.shuffle.partitions": "100",
+            # Delta Lake related configs
+            "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
+            "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
             **self.extra_configs
         }
 
@@ -73,7 +77,7 @@ class SparkSessionFactory:
 
 
         try:
-            session = builder.getOrCreate()
+            session = configure_spark_with_delta_pip(builder).getOrCreate()
             self.logger.info("SparkSession context successfully built (Spark version: %s).", session.version)
             return session
         except Exception as exc:
