@@ -4,3 +4,4 @@ data/
 *__pycache__
 temp
 *artifacts
+*airflow_metadata/
