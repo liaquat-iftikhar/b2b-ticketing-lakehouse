@@ -1,11 +1,14 @@
 import argparse
 import logging
-from typing import Optional, Tuple, Dict
+import os
+from typing import Optional, Tuple
+
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from src.jobs.common.constants import Constants
 from src.jobs.core.base_data_pipeline import BaseDataPipeline
+from src.jobs.core.bronze.db_config_manager import DBConnectionManager, JDBCPartitionConfig
 
 
 class JDBCDatabaseExtractor(BaseDataPipeline):
@@ -18,17 +21,17 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
             self,
             db_table: str,
             execution_date: str,
-            jdbc_url: str,
-            db_properties: Dict[str, str],
-            partition_config: Optional[Dict] = None,
+            connection_manager: DBConnectionManager,
+            partition_config: Optional[JDBCPartitionConfig] = None,
             target_base_path: Optional[str] = None
     ) -> None:
 
         self.db_table = db_table
-        self.partition_config = partition_config or {}
+        self.partition_config = partition_config
 
-        self.jdbc_url = jdbc_url
-        self.db_properties = db_properties
+        # Unpack connection details directly from the manager object
+        self.jdbc_url = connection_manager.jdbc_url
+        self.db_properties = connection_manager.db_properties
 
         self.logger = logging.getLogger(__name__)
 
@@ -38,7 +41,6 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
             etl_name=f"db_ingest_{db_table.lower()}",
             custom_base_path=target_base_path
         )
-
 
     def _extract(self) -> DataFrame:
         """Establishes parallelized JDBC partition read pathways to dump source tables."""
@@ -54,10 +56,10 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
             self.logger.info("Injecting dynamic optimization partition configurations into the JDBC read graph.")
             reader = (
                 reader
-                .option("partitionColumn", self.partition_config["column"])
-                .option("lowerBound", self.partition_config["lower_bound"])
-                .option("upperBound", self.partition_config["upper_bound"])
-                .option("numPartitions", self.partition_config["num_partitions"])
+                .option("partitionColumn", self.partition_config.column)
+                .option("lowerBound", self.partition_config.lower_bound)
+                .option("upperBound", self.partition_config.upper_bound)
+                .option("numPartitions", self.partition_config.num_partitions)
             )
 
         return reader.load()
@@ -94,34 +96,31 @@ if __name__ == "__main__":
     parser.add_argument("--table", required=True, help="Target relational database source table name string.")
     parser.add_argument("--execution_date", required=True, help="Logical date execution block (YYYY-MM-DD)")
 
-    # ADDED: Explicit connection parameters exposed to CLI
+    # Explicit connection parameters exposed to CLI for ad-hoc manual testing runs
     parser.add_argument("--jdbc_url", required=True, help="The complete JDBC target destination host URI string.")
-    parser.add_argument("--db_user", required=True,
-                        help="Authorized connection execution username credential identifier.")
-    parser.add_argument("--db_password", required=True, help="Authorized connection execution security secret token.")
+    parser.add_argument("--db_user", required=True, help="Authorized username credential identifier.")
+    parser.add_argument("--db_password", required=True, help="Authorized execution security secret token.")
     parser.add_argument("--db_driver", default="org.postgresql.Driver",
                         help="Java target execution class connector driver.")
     args = parser.parse_args()
 
-    tuning_matrix = {
-        "column": "id",
-        "lower_bound": "1",
-        "upper_bound": "1000000",
-        "num_partitions": "8"
-    }
+    os.environ["DB_USER"] = args.db_user
+    os.environ["DB_PASSWORD"] = args.db_password
+    os.environ["DB_DRIVER"] = args.db_driver
 
-    # Restructure arguments cleanly back into the dictionary expected by PySpark
-    properties_matrix = {
-        "user": args.db_user,
-        "password": args.db_password,
-        "driver": args.db_driver
-    }
+    conn_manager = DBConnectionManager()
+
+    tuning_strategy = JDBCPartitionConfig(
+        column="id",
+        lower_bound="1",
+        upper_bound="1000000",
+        num_partitions="8"
+    )
 
     extractor = JDBCDatabaseExtractor(
         db_table=args.table,
         execution_date=args.execution_date,
-        jdbc_url=args.jdbc_url,
-        db_properties=properties_matrix,
-        partition_config=tuning_matrix
+        connection_manager=conn_manager,
+        partition_config=tuning_strategy
     )
     extractor.execute()
