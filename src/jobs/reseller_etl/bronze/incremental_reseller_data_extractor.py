@@ -32,8 +32,8 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
 
     def __init__(self, source_path: str, execution_date: str, lakehouse_base_path: Optional[str] = None,
                  etl_name: str = "reseller_etl") -> None:
-
         self.source_path = source_path
+        self.execution_date = execution_date
         self.logger = logging.getLogger(__name__)
 
         super().__init__(
@@ -58,7 +58,7 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
         )
 
     def _transform(self, df: DataFrame) -> Tuple[DataFrame, Optional[DataFrame]]:
-        """Applies ingestion enrichment, sanitizes raw column spaces, and extracts reseller IDs."""
+
         self.logger.info("Enriching landing data payloads by scrubbing column spaces and parsing file origins...")
 
         sanitized_cols = [
@@ -68,13 +68,14 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
         sanitized_df = df.select(*sanitized_cols)
 
         file_path_uri = F.input_file_name()
-
         reseller_id_regex = r"DailySales_[^_]+_([^.]+)"
 
         enriched_stream_df = (
             sanitized_df
             .withColumn("input_file_name", file_path_uri)
             .withColumn("reseller_id", F.regexp_extract(file_path_uri, reseller_id_regex, 1))
+            .withColumn("lh_bronze_execution_date", F.to_date(F.lit(self.execution_date)))
+            .withColumn("lh_bronze_inserted_timestamp", F.current_timestamp())
         )
 
         return enriched_stream_df, None
@@ -89,6 +90,7 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
             df_clean
             .writeStream
             .format("delta")
+            .partitionBy("lh_bronze_execution_date")
             .outputMode("append")
             .option("checkpointLocation", self.lakehouse_paths.checkpoint_dir)
             .trigger(availableNow=True)

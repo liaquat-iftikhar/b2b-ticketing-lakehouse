@@ -48,7 +48,7 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
         # CHANGED: Read format switched from parquet to delta
         df_bronze = self.spark.read.format("delta").load(bronze_src)
 
-        df_slice = df_bronze.filter((F.col("Created_Date") == self.execution_date))
+        df_slice = df_bronze.filter((F.col("lh_bronze_execution_date") == self.execution_date))
         return df_slice
 
     def _transform(self, df: DataFrame) -> Tuple[DataFrame, DataFrame]:
@@ -117,7 +117,8 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
                 "transaction_id", "reseller_id", "event_name", "tickets_count", "net_revenue", "sales_channel", "office_location",
                 "customer_first_name", "customer_last_name", "created_date"
             )
-            .withColumn("silver_inserted_at", F.current_timestamp())
+            .withColumn("lh_silver_execution_date", F.to_date(F.lit(self.execution_date)))
+            .withColumn("lh_silver_inserted_timestamp", F.current_timestamp())
         )
 
         return df_deduped, df_quarantine
