@@ -5,6 +5,8 @@ from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 
+from common.datasets import RESELLER_DATA_EXTRACTOR_DAG_SUCCESS_DATASET
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SPARK_CONN_ID = "spark_local"
 POSTGRES_CONN_ID = "postgres_event_platform"
@@ -12,7 +14,7 @@ POSTGRES_CONN_ID = "postgres_event_platform"
 LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
 SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
 
-TABLE_NAME = "reseller"
+TABLE_NAME = "resellers"
 
 default_args = {
     "owner": "data_platform_team",
@@ -61,4 +63,22 @@ with DAG(
         ]
     )
 
-    start_gate >> ingest_reseller_data >> end_gate
+    transform_reseller_silver = SparkSubmitOperator(
+        task_id="silver_transform_purchases",
+        application=str(
+            SRC_JOBS_ROOT / "reseller_etl" / "silver" / "reseller_data_bronze_to_silver_transformer.py"),
+        conn_id=SPARK_CONN_ID,
+        env_vars={"PYTHONPATH": os.getenv("PYTHONPATH", str(PROJECT_ROOT))},
+        packages="io.delta:delta-spark_2.13:4.1.0",
+        conf={
+            "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
+            "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+        },
+        outlets=[RESELLER_DATA_EXTRACTOR_DAG_SUCCESS_DATASET],
+        application_args=[
+            "--execution_date", "{{ ds }}",
+            "--lakehouse_base_path", str(LAKEHOUSE_PATH)
+        ]
+    )
+
+    start_gate >> ingest_reseller_data >> transform_reseller_silver >> end_gate
