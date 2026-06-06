@@ -7,7 +7,7 @@ from airflow.providers.standard.operators.empty import EmptyOperator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SPARK_CONN_ID = "spark_local"
-POSTGRES_CONN_ID = "postgres_event_platform"  # The ID of your Docker Postgres connection
+POSTGRES_CONN_ID = "postgres_event_platform"
 
 LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
 SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
@@ -34,7 +34,7 @@ with DAG(
     start_gate = EmptyOperator(task_id="start_gate")
     end_gate = EmptyOperator(task_id="end_gate")
 
-    ingest_organizer_data = SparkSubmitOperator(
+    ingest_reseller_data = SparkSubmitOperator(
         task_id="bronze_ingest_reseller_data",
         application=str(SRC_JOBS_ROOT / "core" / "bronze" / "database_table_extractor.py"),
         conn_id=SPARK_CONN_ID,
@@ -61,4 +61,4 @@ with DAG(
         ]
     )
 
-    start_gate >> ingest_organizer_data >> end_gate
+    start_gate >> ingest_reseller_data >> end_gate

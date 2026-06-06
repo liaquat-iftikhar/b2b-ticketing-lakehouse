@@ -8,7 +8,7 @@ from airflow.providers.standard.operators.empty import EmptyOperator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SPARK_CONN_ID = "spark_local"
-POSTGRES_CONN_ID = "postgres_event_platform"  # The ID of your Docker Postgres connection
+POSTGRES_CONN_ID = "postgres_event_platform"
 
 LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
 SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
