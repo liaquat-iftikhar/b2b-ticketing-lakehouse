@@ -20,7 +20,7 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
     """
 
     def __init__(self, execution_date: str, lakehouse_base_path: Optional[str] = None,
-                 etl_name: str = "resellers_etl") -> None:
+                 etl_name: str = "reseller_etl") -> None:
         self.execution_date = execution_date
         self.logger = logging.getLogger(__name__)
 
@@ -48,12 +48,10 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
 
         conformed_df = (
             df
-            .withColumn("reseller_id", F.col("id").cast(IntegerType()))
             .withColumn("reseller_corporate_name", F.col("name").cast(StringType()))
-            .withColumn("region", F.col("location_region").cast(StringType()))
-            .withColumn("partnership_start_timestamp", F.col("_created_at").cast(TimestampType()))
-            .withColumn("info_last_update_timestamp", F.col("_updated_at").cast(TimestampType()))
-            .drop("id", "name", "location_region", "_created_at", "_updated_at")
+            .withColumn("record_inserted_timestamp", F.col("_created_at").cast(TimestampType()))
+            .withColumn("record_last_updated_timestamp", F.col("_updated_at").cast(TimestampType()))
+            .drop("name", "_created_at", "_updated_at")
         )
 
         window_spec = Window.partitionBy("reseller_id").orderBy(F.col("lh_bronze_inserted_timestamp").desc())
@@ -70,9 +68,10 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
             .withColumn("lh_silver_execution_date", F.to_date(F.lit(self.execution_date)))
             .withColumn("lh_silver_inserted_timestamp", F.current_timestamp())
             .select(
-                "reseller_id", "reseller_corporate_name", "region", "partnership_start_timestamp",
-                "info_last_update_timestamp", "lh_bronze_execution_date", "lh_bronze_inserted_timestamp",
-                "lh_bronze_source_database_table", "lh_silver_execution_date", "lh_silver_inserted_timestamp"
+                "reseller_id", "reseller_corporate_name", "email", "phone", "city", "country", "region",
+                "record_inserted_timestamp", "record_last_updated_timestamp", "lh_bronze_execution_date",
+                "lh_bronze_inserted_timestamp", "lh_bronze_source_database_table", "lh_silver_execution_date",
+                "lh_silver_inserted_timestamp"
             )
         )
         return final_silver_df, None

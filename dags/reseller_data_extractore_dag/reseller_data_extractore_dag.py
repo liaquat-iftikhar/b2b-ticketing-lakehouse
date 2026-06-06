@@ -14,7 +14,7 @@ POSTGRES_CONN_ID = "postgres_event_platform"
 LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
 SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
 
-TABLE_NAME = "resellers"
+TABLE_NAME = "reseller"
 
 default_args = {
     "owner": "data_platform_team",
