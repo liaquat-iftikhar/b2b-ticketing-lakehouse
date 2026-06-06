@@ -31,7 +31,7 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
     ])
 
     def __init__(self, source_path: str, execution_date: str, lakehouse_base_path: Optional[str] = None,
-                 etl_name: str = "reseller_etl") -> None:
+                 etl_name: str = "reseller_sale_etl") -> None:
         self.source_path = source_path
         self.execution_date = execution_date
         self.logger = logging.getLogger(__name__)

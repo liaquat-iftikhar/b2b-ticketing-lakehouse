@@ -19,7 +19,7 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
     Handles schema mapping, data cleansing, validation filters, and idempotent deduplication.
     """
 
-    def __init__(self, execution_date: str, etl_name: str = "reseller_etl",
+    def __init__(self, execution_date: str, etl_name: str = "reseller_sale_etl",
                  lakehouse_base_path: Optional[str] = None) -> None:
         super().__init__(
             execution_date=execution_date,
@@ -172,7 +172,7 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Medallion Bronze-to-Silver Incremental Transform Pipeline")
     parser.add_argument("--execution_date", required=True, help="Processing date slice token (Format: YYYY-MM-DD)")
-    parser.add_argument("--etl_name", default="reseller_etl", help="Target identity scope for lakehouse data folders.")
+    parser.add_argument("--etl_name", default="reseller_sale_etl", help="Target identity scope for lakehouse data folders.")
     parser.add_argument("--lakehouse_base_path", default=None, help="Overriding base target directory path URI string.")
     args = parser.parse_args()
 

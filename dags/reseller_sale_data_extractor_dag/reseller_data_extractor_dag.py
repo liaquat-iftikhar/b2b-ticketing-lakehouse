@@ -5,7 +5,7 @@ from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 
-from common.datasets import RESELLER_DATA_EXTRACTOR_DAG_SUCCESS_DATASET
+from common.datasets import RESELLER_SALE_DATA_EXTRACTOR_DAG_SUCCESS_DATASET
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SPARK_CONN_ID = "spark_local"
@@ -24,7 +24,7 @@ default_args = {
 }
 
 with DAG(
-        dag_id="reseller_data_extractor_dag",
+        dag_id="reseller_sale_data_extractor_dag",
         default_args=default_args,
         description="Extract reseller data",
         schedule="@daily",
@@ -38,7 +38,7 @@ with DAG(
 
     ingest_reseller_files = SparkSubmitOperator(
         task_id="bronze_ingest_reseller_files",
-        application=str(SRC_JOBS_ROOT / "reseller_etl" / "bronze" / "incremental_reseller_data_extractor.py"),
+        application=str(SRC_JOBS_ROOT / "reseller_sale_etl" / "bronze" / "incremental_reseller_data_extractor.py"),
         conn_id=SPARK_CONN_ID,
         env_vars={"PYTHONPATH": os.getenv("PYTHONPATH", str(PROJECT_ROOT))},
         packages="io.delta:delta-spark_2.13:4.1.0",
@@ -55,7 +55,7 @@ with DAG(
 
     transform_resellers_silver = SparkSubmitOperator(
         task_id="silver_transform_resellers",
-        application=str(SRC_JOBS_ROOT / "reseller_etl" / "silver" / "reseller_data_bronze_to_silver_transformer.py"),
+        application=str(SRC_JOBS_ROOT / "reseller_sale_etl" / "silver" / "reseller_data_bronze_to_silver_transformer.py"),
         conn_id=SPARK_CONN_ID,
         env_vars={"PYTHONPATH": os.getenv("PYTHONPATH", str(PROJECT_ROOT))},
         packages="io.delta:delta-spark_2.13:4.1.0",
@@ -63,7 +63,7 @@ with DAG(
             "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
             "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog"
         },
-        outlets=[RESELLER_DATA_EXTRACTOR_DAG_SUCCESS_DATASET],
+        outlets=[RESELLER_SALE_DATA_EXTRACTOR_DAG_SUCCESS_DATASET],
         application_args=[
             "--execution_date", "{{ ds }}",
             "--lakehouse_base_path", str(LAKEHOUSE_PATH)

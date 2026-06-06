@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from pyspark.sql import SparkSession
 
-from src.jobs.reseller_etl.bronze.incremental_reseller_data_extractor import IncrementalResellerDataExtractor
+from src.jobs.reseller_sale_etl.bronze.incremental_reseller_data_extractor import IncrementalResellerDataExtractor
 
 
 class TestIncrementalResellerDataExtractor(unittest.TestCase):
@@ -33,7 +33,7 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         """Set up temporary working directories for file simulation."""
         self.test_dir = tempfile.mkdtemp()
         self.source_path = os.path.join(self.test_dir, "inbound")
-        self.target_base_path = os.path.join(self.test_dir, "lakehouse")
+        self.lakehouse_base_path = os.path.join(self.test_dir, "lakehouse")
 
         os.makedirs(self.source_path, exist_ok=True)
 
@@ -49,24 +49,22 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         extractor_custom = IncrementalResellerDataExtractor(
             source_path=self.source_path,
             execution_date="2026-06-05",
-            target_base_path=self.target_base_path
+            lakehouse_base_path=self.lakehouse_base_path
         )
 
         self.assertEqual(extractor_custom.source_path, self.source_path)
-        # It should end with 'lakehouse/bronze' because custom path overrides default layout tokens
-        self.assertTrue(extractor_custom.lakehouse_paths.target_dir.endswith("lakehouse/bronze"))
+        self.assertTrue(extractor_custom.lakehouse_paths.target_dir.endswith("lakehouse/reseller_sale_etl/bronze"))
         self.assertTrue(
-            extractor_custom.lakehouse_paths.checkpoint_dir.endswith("lakehouse/_checkpoints/reseller_etl_to_bronze"))
+            extractor_custom.lakehouse_paths.checkpoint_dir.endswith("lakehouse/reseller_sale_etl/_checkpoints/reseller_sale_etl_to_bronze"))
 
         # Scenario B: Verifying path resolution when falling back to the internal default workspace path
         extractor_default = IncrementalResellerDataExtractor(
             source_path=self.source_path,
             execution_date="2026-06-05",
-            target_base_path=None  # Triggers default project root path resolution logic
+            lakehouse_base_path=None  # Triggers default project root path resolution logic
         )
 
-        # It should end with 'reseller_etl/bronze' when using internal fallbacks
-        self.assertTrue(extractor_default.lakehouse_paths.target_dir.endswith("reseller_etl/bronze"))
+        self.assertTrue(extractor_default.lakehouse_paths.target_dir.endswith("reseller_sale_etl/bronze"))
 
     @patch("src.jobs.core.base_data_pipeline.SparkSessionFactory")
     def test_extract_raises_file_not_found_for_missing_source(self, mock_spark_factory) -> None:
@@ -76,7 +74,7 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         extractor = IncrementalResellerDataExtractor(
             source_path=non_existent_path,
             execution_date="2026-06-05",
-            target_base_path=self.target_base_path
+            lakehouse_base_path=self.lakehouse_base_path
         )
         extractor.spark = self.spark
 
@@ -91,7 +89,7 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         extractor = IncrementalResellerDataExtractor(
             source_path=self.source_path,
             execution_date="2026-06-05",
-            target_base_path=self.target_base_path
+            lakehouse_base_path=self.lakehouse_base_path
         )
 
         # Build mock source batch data matching schema
@@ -105,8 +103,7 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         self.assertIn("input_file_name", clean_df.columns)
         self.assertIsNone(quarantine_df)
 
-        # Verify schema preservation
-        self.assertEqual(len(clean_df.columns), len(extractor.DATA_CONTRACT_SCHEMA.names) + 2)
+        self.assertEqual(len(clean_df.columns), len(extractor.DATA_CONTRACT_SCHEMA.names) + 4)
 
     @patch("src.jobs.core.base_data_pipeline.SparkSessionFactory")
     def test_load_starts_and_terminates_streaming_query(self, mock_spark_factory) -> None:
@@ -115,7 +112,7 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         extractor = IncrementalResellerDataExtractor(
             source_path=self.source_path,
             execution_date="2026-06-05",
-            target_base_path=self.target_base_path
+            lakehouse_base_path=self.lakehouse_base_path
         )
 
         # Mock structural streaming outputs
@@ -123,9 +120,10 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         mock_writer = MagicMock()
         mock_df_clean = MagicMock()
 
-        # Build execution mock chain: df.writeStream.format.outputMode.option.trigger.start
         mock_df_clean.writeStream = mock_writer
         mock_writer.format.return_value = mock_writer
+        mock_writer.partitionBy.return_value = mock_writer
+        mock_writer.clusterBy.return_value = mock_writer
         mock_writer.outputMode.return_value = mock_writer
         mock_writer.option.return_value = mock_writer
         mock_writer.trigger.return_value = mock_writer
@@ -137,7 +135,7 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         # Assert
         mock_writer.format.assert_called_once_with("delta")
         mock_writer.outputMode.assert_called_once_with("append")
-        mock_writer.option.assert_called_once_with("checkpointLocation", extractor.lakehouse_paths.checkpoint_dir)
+        mock_writer.option.assert_called_with("checkpointLocation", extractor.lakehouse_paths.checkpoint_dir)
         mock_writer.start.assert_called_once_with(extractor.lakehouse_paths.target_dir)
         mock_query.awaitTermination.assert_called_once()
 
