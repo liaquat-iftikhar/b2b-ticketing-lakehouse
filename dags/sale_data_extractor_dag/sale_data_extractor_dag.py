@@ -5,7 +5,7 @@ from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 
-from common.datasets import PURCHASE_DATA_EXTRACTOR_DAG_SUCCESS_DATASET
+from common.datasets import SALE_DATA_EXTRACTOR_DAG_SUCCESS_DATASET
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SPARK_CONN_ID = "spark_local"
@@ -14,7 +14,7 @@ POSTGRES_CONN_ID = "postgres_event_platform"
 LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
 SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
 
-TABLE_NAME = "purchases"
+TABLE_NAME = "sale"
 
 default_args = {
     "owner": "data_platform_team",
@@ -24,20 +24,20 @@ default_args = {
 }
 
 with DAG(
-        dag_id="purchase_data_extractor_dag",
+        dag_id="sale_data_extractor_dag",
         default_args=default_args,
         description="Extract and ingest operational purchase metadata into the Lakehouse",
         schedule="@daily",
         start_date=datetime(2026, 6, 1),
         catchup=False,
         max_active_runs=1,
-        tags=["purchase", "extractor", "production"],
+        tags=["sale", "extractor", "production"],
 ) as dag:
     start_gate = EmptyOperator(task_id="start_gate")
     end_gate = EmptyOperator(task_id="end_gate")
 
     ingest_purchase_data = SparkSubmitOperator(
-        task_id="bronze_ingest_purchase_data",
+        task_id="bronze_ingest_sale_data",
         application=str(SRC_JOBS_ROOT / "core" / "bronze" / "database_table_extractor.py"),
         conn_id=SPARK_CONN_ID,
 
@@ -64,9 +64,9 @@ with DAG(
     )
 
     transform_purchase_silver = SparkSubmitOperator(
-        task_id="silver_transform_purchases",
+        task_id="silver_transform_sale",
         application=str(
-            SRC_JOBS_ROOT / "purchase_etl" / "silver" / "purchase_data_bronze_to_silver_transformer.py"),
+            SRC_JOBS_ROOT / "sale_etl" / "silver" / "sale_data_bronze_to_silver_transformer.py"),
         conn_id=SPARK_CONN_ID,
         env_vars={"PYTHONPATH": os.getenv("PYTHONPATH", str(PROJECT_ROOT))},
         packages="io.delta:delta-spark_2.13:4.1.0",
@@ -74,7 +74,7 @@ with DAG(
             "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
             "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog"
         },
-        outlets=[PURCHASE_DATA_EXTRACTOR_DAG_SUCCESS_DATASET],
+        outlets=[SALE_DATA_EXTRACTOR_DAG_SUCCESS_DATASET],
         application_args=[
             "--execution_date", "{{ ds }}",
             "--lakehouse_base_path", str(LAKEHOUSE_PATH)

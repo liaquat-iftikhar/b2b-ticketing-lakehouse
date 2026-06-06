@@ -12,14 +12,14 @@ from src.jobs.common.constants import Constants
 from src.jobs.core.base_data_pipeline import BaseDataPipeline
 from src.jobs.common.lakehouse_path_resolver import LakehousePathResolver
 
-class PurchaseDataBronzeToSilverTransformer(BaseDataPipeline):
+class SaleDataBronzeToSilverTransformer(BaseDataPipeline):
     """
-    Consumes raw Bronze Delta entries, enforces type conformance, removes transactional duplicates, and performs
+    Enforces type conformance and removes transactional duplicates from sale bronze data. Performs
     idempotent upserts (MERGE) into the Silver tier.
     """
 
     def __init__(self, execution_date: str, lakehouse_base_path: Optional[str] = None,
-                 etl_name: str = "purchases_etl") -> None:
+                 etl_name: str = "sale_etl") -> None:
         self.execution_date = execution_date
         self.logger = logging.getLogger(__name__)
 
@@ -49,17 +49,12 @@ class PurchaseDataBronzeToSilverTransformer(BaseDataPipeline):
         # Enforce strict data types and drop unrefined legacy raw source strings
         conformed_df = (
             df
-            .withColumn("purchase_id", F.col("id").cast(IntegerType()))
-            .withColumn("organizer_id", F.col("organizer_id").cast(IntegerType()))
-            .withColumn("reseller_id", F.col("reseller_id").cast(IntegerType()))
-            .withColumn("customer_id", F.col("customer_id").cast(IntegerType()))
-            .withColumn("ticket_count", F.col("quantity").cast(IntegerType()))
-            .withColumn("total_amount_usd", F.col("total_amount").cast(DecimalType(18, 2)))
-            .withColumn("purchase_timestamp", F.col("_created_at").cast(TimestampType()))
-            .drop("id", "quantity", "total_amount", "_created_at", "_updated_at")
+            .withColumn("record_inserted_timestamp", F.col("_created_at").cast(TimestampType()))
+            .withColumn("record_last_updated_timestamp", F.col("_updated_at").cast(TimestampType()))
+            .drop("_created_at", "_updated_at")
         )
 
-        window_spec = Window.partitionBy("purchase_id").orderBy(F.col("lh_bronze_inserted_timestamp").desc())
+        window_spec = Window.partitionBy("reseller_id", "sale_id").orderBy(F.col("lh_bronze_inserted_timestamp").desc())
 
         deduplicated_df = (
             conformed_df
@@ -74,8 +69,9 @@ class PurchaseDataBronzeToSilverTransformer(BaseDataPipeline):
             .withColumn("lh_silver_execution_date", F.to_date(F.lit(self.execution_date)))
             .withColumn("lh_silver_inserted_timestamp", F.current_timestamp())
             .select(
-                "organizer_id", "reseller_id", "customer_id", "purchase_id", "sales_channel", "ticket_type",
-                "ticket_count", "total_amount_usd", "purchase_timestamp", "lh_bronze_execution_date",
+                "sale_id", "ticket_id", "customer_id", "organizer_id", "reseller_id", "agreement_id", "channel",
+                "quantity", "unit_price", "total_amount", "commission_amount", "source", "sale_date",
+                "record_inserted_timestamp", "record_last_updated_timestamp", "lh_bronze_execution_date",
                 "lh_bronze_inserted_timestamp", "lh_bronze_source_database_table", "lh_silver_execution_date",
                 "lh_silver_inserted_timestamp"
             )
@@ -104,12 +100,13 @@ class PurchaseDataBronzeToSilverTransformer(BaseDataPipeline):
         else:
             self.logger.info("Target Delta table log structure confirmed. Instantiating matching merge layout...")
             target_table = DeltaTable.forPath(self.spark, self.lakehouse_paths.target_dir)
-
+            merge_condition = "target.sale_id = updates.sale_id"
+            merge_condition += " AND target.reseller_id IS NOT DISTINCT FROM updates.reseller_id"
             (
                 target_table.alias("target")
                 .merge(
                     source=df_clean.alias("updates"),
-                    condition="target.purchase_id = updates.purchase_id"
+                    condition=merge_condition,
                 )
                 .whenMatchedUpdateAll()
                 .whenNotMatchedInsertAll()
@@ -120,7 +117,7 @@ class PurchaseDataBronzeToSilverTransformer(BaseDataPipeline):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Lakehouse Purchases Silver Layer Conformance Transformer Engine")
+    parser = argparse.ArgumentParser(description="Lakehouse Sale Silver Layer Conformance Transformer Engine")
     parser.add_argument(
         "--execution_date",
         required=True,
@@ -133,7 +130,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    transformer = PurchaseDataBronzeToSilverTransformer(
+    transformer = SaleDataBronzeToSilverTransformer(
         execution_date=args.execution_date,
         lakehouse_base_path=args.lakehouse_base_path
     )
