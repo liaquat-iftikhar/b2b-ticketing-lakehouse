@@ -13,7 +13,7 @@ from src.jobs.core.base_data_pipeline import BaseDataPipeline
 from src.jobs.common.lakehouse_path_resolver import LakehousePathResolver
 
 
-class CustomerDataBronzeToSilverTransformer(BaseDataPipeline):
+class EventDataBronzeToSilverTransformer(BaseDataPipeline):
     """
     Enforces type conformance, removes duplicates on Bronze Event data and performs idempotent upserts (MERGE) into
     the Silver tier.
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     parser.add_argument("--lakehouse_base_path", required=True)
     args = parser.parse_args()
 
-    transformer = CustomerDataBronzeToSilverTransformer(
+    transformer = EventDataBronzeToSilverTransformer(
         execution_date=args.execution_date,
         lakehouse_base_path=args.lakehouse_base_path
     )
