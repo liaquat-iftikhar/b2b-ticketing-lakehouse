@@ -14,7 +14,7 @@ POSTGRES_CONN_ID = "postgres_event_platform"
 LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
 SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
 
-TABLE_NAME = "organizers"
+TABLE_NAME = "organizer"
 
 default_args = {
     "owner": "data_platform_team",
@@ -64,7 +64,7 @@ with DAG(
     )
 
     transform_organizer_silver = SparkSubmitOperator(
-        task_id="silver_transform_purchases",
+        task_id="silver_transform_organizer",
         application=str(
             SRC_JOBS_ROOT / "organizer_etl" / "silver" / "organizer_data_bronze_to_silver_transformer.py"),
         conn_id=SPARK_CONN_ID,

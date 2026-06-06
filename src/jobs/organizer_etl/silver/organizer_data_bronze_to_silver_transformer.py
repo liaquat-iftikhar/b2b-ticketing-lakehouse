@@ -20,7 +20,7 @@ class OrganizerDataBronzeToSilverTransformer(BaseDataPipeline):
     """
 
     def __init__(self, execution_date: str, lakehouse_base_path: Optional[str] = None,
-                 etl_name: str = "organizers_etl") -> None:
+                 etl_name: str = "organizer_etl") -> None:
         self.execution_date = execution_date
         self.logger = logging.getLogger(__name__)
 
@@ -48,7 +48,6 @@ class OrganizerDataBronzeToSilverTransformer(BaseDataPipeline):
 
         conformed_df = (
             df
-            .withColumn("organizer_id", F.col("id").cast(IntegerType()))
             .withColumn("organization_name", F.col("name").cast(StringType()))
             .withColumn("onboarding_timestamp", F.col("_created_at").cast(TimestampType()))
             .withColumn("profile_last_update_timestamp", F.col("_updated_at").cast(TimestampType()))
@@ -69,9 +68,9 @@ class OrganizerDataBronzeToSilverTransformer(BaseDataPipeline):
             .withColumn("lh_silver_execution_date", F.to_date(F.lit(self.execution_date)))
             .withColumn("lh_silver_inserted_timestamp", F.current_timestamp())
             .select(
-                "organizer_id", "organization_name", "onboarding_timestamp", "profile_last_update_timestamp",
-                "lh_bronze_execution_date", "lh_bronze_inserted_timestamp", "lh_bronze_source_database_table",
-                "lh_silver_execution_date", "lh_silver_inserted_timestamp"
+                "organizer_id", "organization_name", "email", "phone", "address", "onboarding_timestamp",
+                "profile_last_update_timestamp", "lh_bronze_execution_date", "lh_bronze_inserted_timestamp",
+                "lh_bronze_source_database_table", "lh_silver_execution_date", "lh_silver_inserted_timestamp"
             )
         )
         return final_silver_df, None
