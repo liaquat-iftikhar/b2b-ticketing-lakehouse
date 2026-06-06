@@ -13,6 +13,7 @@ BEGIN
   NEW._updated_at = NOW();
   RETURN NEW;
 END;
+$$ LANGUAGE plpgsql;
 
 
 CREATE TABLE organizer (

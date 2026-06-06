@@ -6,7 +6,7 @@ from delta.tables import DeltaTable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-from pyspark.sql.types import IntegerType, StringType, TimestampType
+from pyspark.sql.types import TimestampType
 
 from src.jobs.common.constants import Constants
 from src.jobs.core.base_data_pipeline import BaseDataPipeline
@@ -20,7 +20,7 @@ class CustomerDataBronzeToSilverTransformer(BaseDataPipeline):
     """
 
     def __init__(self, execution_date: str, lakehouse_base_path: Optional[str] = None,
-                 etl_name: str = "customers_etl") -> None:
+                 etl_name: str = "customer_etl") -> None:
         self.execution_date = execution_date
         self.logger = logging.getLogger(__name__)
 
@@ -49,9 +49,6 @@ class CustomerDataBronzeToSilverTransformer(BaseDataPipeline):
         # Enforce strict data types and map from raw source names
         conformed_df = (
             df
-            .withColumn("customer_id", F.col("id").cast(IntegerType()))
-            .withColumn("name", F.col("name").cast(StringType()))
-            .withColumn("email", F.trim(F.col("email")).cast(StringType()))
             .withColumn("profile_created_timestamp", F.col("_created_at").cast(TimestampType()))
             .withColumn("profile_last_updated_timestamp", F.col("_updated_at").cast(TimestampType()))
             .drop("id", "_created_at", "_updated_at")
@@ -71,9 +68,9 @@ class CustomerDataBronzeToSilverTransformer(BaseDataPipeline):
             .withColumn("lh_silver_execution_date", F.to_date(F.lit(self.execution_date)))
             .withColumn("lh_silver_inserted_timestamp", F.current_timestamp())
             .select(
-                "customer_id", "name", "email", "profile_created_timestamp", "profile_last_updated_timestamp",
-                "lh_bronze_execution_date", "lh_bronze_inserted_timestamp", "lh_bronze_source_database_table",
-                "lh_silver_execution_date", "lh_silver_inserted_timestamp"
+                "customer_id", "first_name", "last_name", "email", "phone", "region", "profile_created_timestamp",
+                "profile_last_updated_timestamp", "lh_bronze_execution_date", "lh_bronze_inserted_timestamp",
+                "lh_bronze_source_database_table", "lh_silver_execution_date", "lh_silver_inserted_timestamp"
             )
         )
         return final_silver_df, None

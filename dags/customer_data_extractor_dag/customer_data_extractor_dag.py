@@ -14,7 +14,7 @@ POSTGRES_CONN_ID = "postgres_event_platform"
 LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
 SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
 
-TABLE_NAME = "customers"
+TABLE_NAME = "customer"
 
 default_args = {
     "owner": "data_platform_team",
@@ -37,7 +37,7 @@ with DAG(
     end_gate = EmptyOperator(task_id="end_gate")
 
     ingest_customers_data = SparkSubmitOperator(
-        task_id="bronze_ingest_ocustomer_data",
+        task_id="bronze_ingest_customer_data",
         application=str(SRC_JOBS_ROOT / "core" / "bronze" / "database_table_extractor.py"),
         conn_id=SPARK_CONN_ID,
 
@@ -64,7 +64,7 @@ with DAG(
     )
 
     transform_customer_silver = SparkSubmitOperator(
-        task_id="silver_transform_purchases",
+        task_id="silver_transform_customer",
         application=str(
             SRC_JOBS_ROOT / "customer_etl" / "silver" / "customer_data_bronze_to_silver_transformer.py"),
         conn_id=SPARK_CONN_ID,

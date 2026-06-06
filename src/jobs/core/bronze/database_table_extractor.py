@@ -116,13 +116,13 @@ if __name__ == "__main__":
 
     conn_manager = DBConnectionManager()
 
-    tuning_strategy = JDBCPartitionConfig(
-        column="id",
-        lower_bound="1",
-        upper_bound="1000000",
-        num_partitions="8"
-    )
-
+    # tuning_strategy = JDBCPartitionConfig(
+    #     column="id",
+    #     lower_bound="1",
+    #     upper_bound="1000000",
+    #     num_partitions="8"
+    # )
+    tuning_strategy = None
     extractor = JDBCDatabaseExtractor(
         db_table=args.table,
         execution_date=args.execution_date,

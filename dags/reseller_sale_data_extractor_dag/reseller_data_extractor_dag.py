@@ -26,12 +26,12 @@ default_args = {
 with DAG(
         dag_id="reseller_sale_data_extractor_dag",
         default_args=default_args,
-        description="Extract reseller data",
+        description="Extract reseller_sales_csv data",
         schedule="@daily",
         start_date=datetime(2026, 6, 1),
         catchup=False,
         max_active_runs=1,
-        tags=["reseller", "extractor", "production"],
+        tags=["reseller_sales_csv", "extractor", "production"],
 ) as dag:
     start_gate = EmptyOperator(task_id="start_gate")
     end_gate = EmptyOperator(task_id="end_gate")
