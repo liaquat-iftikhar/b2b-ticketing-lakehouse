@@ -13,7 +13,6 @@ POSTGRES_CONN_ID = "postgres_event_platform"  # The ID of your Docker Postgres c
 LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
 SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
 
-# 👇 GOOD PRACTICE: Keep the table name as an explicit local DAG constant
 TABLE_NAME = "organizers"
 
 default_args = {
@@ -41,7 +40,6 @@ with DAG(
         application=str(SRC_JOBS_ROOT / "core" / "bronze" / "database_table_extractor.py"),
         conn_id=SPARK_CONN_ID,
 
-        # Point paths to the project virtual environment Python binary
         env_vars={
             "PYTHONPATH": os.getenv("PYTHONPATH", str(PROJECT_ROOT)),
             "PYSPARK_PYTHON": str(PROJECT_ROOT / ".venv" / "bin" / "python"),
