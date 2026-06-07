@@ -103,7 +103,7 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         self.assertIn("input_file_name", clean_df.columns)
         self.assertIsNone(quarantine_df)
 
-        self.assertEqual(len(clean_df.columns), len(extractor.DATA_CONTRACT_SCHEMA.names) + 4)
+        self.assertEqual(len(clean_df.columns), len(extractor.DATA_CONTRACT_SCHEMA.names) + 5)
 
     @patch("src.jobs.core.base_data_pipeline.SparkSessionFactory")
     def test_load_starts_and_terminates_streaming_query(self, mock_spark_factory) -> None:
