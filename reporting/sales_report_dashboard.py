@@ -65,7 +65,6 @@ class DashboardFilters:
     @st.cache_data(ttl=60)
     def _fetch_dimensions(path: str):
         """Static cached query extractor protecting instance serialization tracking loops."""
-
         con = duckdb.connect(database=':memory:')
         con.execute("INSTALL delta; LOAD delta;")
 
@@ -78,30 +77,34 @@ class DashboardFilters:
         return event_types, resellers
 
     def get_where_clause(self) -> str:
-        """Compiles dynamic checklist selections into a standardized safe SQL injection text sequence."""
+        """Compiles selections into valid SQL, preventing exceptions when filters are unset."""
+
+        if not self.selected_event_types or not self.selected_resellers:
+            return "WHERE 1=0"
+
         where_clause = "WHERE 1=1"
 
-        if self.selected_event_types:
-            if len(self.selected_event_types) == 1:
-                where_clause += f" AND event_type = '{self.selected_event_types[0]}'"
+        if len(self.selected_event_types) == 1:
+            where_clause += f" AND event_type = '{self.selected_event_types[0]}'"
+        else:
+            where_clause += f" AND event_type IN {tuple(self.selected_event_types)}"
+
+        reseller_filter = [r for r in self.selected_resellers if r != 'Direct Platform Sale']
+        conditions = []
+
+        if reseller_filter:
+            if len(reseller_filter) == 1:
+                conditions.append(f"reseller_id = '{reseller_filter[0]}'")
             else:
-                where_clause += f" AND event_type IN {tuple(self.selected_event_types)}"
+                conditions.append(f"reseller_id IN {tuple(reseller_filter)}")
 
-        if self.selected_resellers:
-            reseller_filter = [r for r in self.selected_resellers if r != 'Direct Platform Sale']
-            conditions = []
+        if 'Direct Platform Sale' in self.selected_resellers:
+            conditions.append("reseller_id IS NULL")
 
-            if reseller_filter:
-                if len(reseller_filter) == 1:
-                    conditions.append(f"reseller_id = '{reseller_filter[0]}'")
-                else:
-                    conditions.append(f"reseller_id IN {tuple(reseller_filter)}")
-
-            if 'Direct Platform Sale' in self.selected_resellers:
-                conditions.append("reseller_id IS NULL")
-
-            if conditions:
-                where_clause += f" AND ({' OR '.join(conditions)})"
+        if conditions:
+            where_clause += f" AND ({' OR '.join(conditions)})"
+        else:
+            return "WHERE 1=0"
 
         return where_clause
 
@@ -123,11 +126,9 @@ class SalesDashboardView:
         st.markdown("### Open-Source Serverless Data Lakehouse Reporting Engine")
         st.write("---")
 
-        # Instantiate inputs
         self.filters.render_sidebar()
         filter_sql = self.filters.get_where_clause()
 
-        # Build layout layers
         self._render_workspace_tabs(filter_sql)
         self._render_ledger_table(filter_sql)
 
@@ -167,7 +168,8 @@ class SalesDashboardView:
                 {filter_sql}
                 AND EXTRACT(MONTH FROM CAST(sale_date AS DATE)) = 2
                 AND EXTRACT(YEAR FROM CAST(sale_date AS DATE)) IN (2019, 2020)
-                GROUP BY 1 ORDER BY sale_year ASC
+                GROUP BY 1
+                ORDER BY sale_year ASC
             """)
             if not df_feb.empty and 2020 in df_feb['sale_year'].values:
                 rev_19 = df_feb[df_feb['sale_year'] == 2019]['gross_revenue'].values[0] if 2019 in df_feb[
@@ -180,17 +182,30 @@ class SalesDashboardView:
                 fig = px.bar(df_feb, x="sale_year", y="gross_revenue", color="sale_year")
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.info("Baseline data points for comparison windows are unavailable.")
+                st.info("Baseline data points for comparison windows are unavailable within current filters.")
 
         with tab3:
             st.subheader("Commission Rate Performance Correlation Analysis")
             df_comm = self.model.run_query(f"""
                 SELECT CAST(commission_rate_applied AS DOUBLE) as commission_rate, total_amount as transaction_value, tickets_count as quantity_sold
-                FROM delta_scan('{self.model.warehouse_path}') {filter_sql} AND source = 'csv_import'
+                FROM delta_scan('{self.model.warehouse_path}') {filter_sql}
             """)
+
             if not df_comm.empty:
-                fig = px.scatter(df_comm, x="commission_rate", y="transaction_value", size="quantity_sold",
-                                 trendline="ols")
+                scatter_kwargs = {
+                    "data_frame": df_comm,
+                    "x": "commission_rate",
+                    "y": "transaction_value",
+                    "size": "quantity_sold",
+                    "labels": {"commission_rate": "Incentive Commission Bracket (%)",
+                               "transaction_value": "Logged Gross Value ($)"},
+                    "title": "Regression Distribution: Commission Structure Influence Matrix"
+                }
+
+                scatter_kwargs["trendline"] = "ols"
+                scatter_kwargs["trendline_color_override"] = "#D62728"
+
+                fig = px.scatter(**scatter_kwargs)
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("Incentive transaction metrics are empty for the current parameters.")
@@ -243,6 +258,8 @@ class SalesDashboardView:
                 file_name="conformed_data_warehouse_sales_export.csv",
                 mime="text/csv"
             )
+        else:
+            st.warning("No ledger entries compiled for current selection parameters.")
 
 
 # ==============================================================================
