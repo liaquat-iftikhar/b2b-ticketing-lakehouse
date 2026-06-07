@@ -5,3 +5,7 @@ data/
 temp
 *artifacts
 *airflow_metadata/
+.env
+config/.secrets.toml
+.venv/
+tmp/
