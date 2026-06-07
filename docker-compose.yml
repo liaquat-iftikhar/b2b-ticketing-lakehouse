@@ -20,9 +20,9 @@ x-airflow-common: &airflow-common
     AIRFLOW__LOGGING__FAB_LOGGING_LEVEL: WARN
     AIRFLOW__LOGGING__COLORED_CONSOLE_LOG: "false"
 
-    # ---- Native Automated Connections
-    AIRFLOW_CONN_SPARK_DEFAULT: '{"conn_type": "spark", "host": "local[*]"}'
-    AIRFLOW_CONN_POSTGRES_DEFAULT: '{"conn_type": "postgres", "host": "operational-postgres", "port": 5432, "login": "postgres", "password": "postgres", "schema": "event_platform"}'
+    # ---- Airflow connections (names must match conn IDs in settings.toml [default.airflow]) ----
+    AIRFLOW_CONN_SPARK_LOCAL: '{"conn_type": "spark", "host": "local[*]"}'
+    AIRFLOW_CONN_POSTGRES_EVENT_PLATFORM: '{"conn_type": "postgres", "host": "operational-postgres", "port": 5432, "login": "postgres", "password": "postgres", "schema": "event_platform"}'
 
     # ---- Database (Airflow metadata) ----
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
