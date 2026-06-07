@@ -1,0 +1,46 @@
+[default]
+
+[default.spark]
+app_name            = "reseller_sale_etl"
+shuffle_partitions  = 100
+extra_configs       = {}
+
+[default.storage]
+type      = "local"
+base_path = "/tmp/lakehouse"
+
+[default.database]
+host   = "localhost"
+port   = 5432
+name   = "event_platform"
+user   = "postgres"
+driver = "org.postgresql.Driver"
+
+
+[local]
+
+[local.storage]
+type      = "local"
+base_path = "/tmp/lakehouse"
+
+[local.database]
+host = "postgres"
+port = 5432
+
+[production]
+
+[production.spark]
+shuffle_partitions = 200
+
+[production.spark.extra_configs]
+"spark.hadoop.fs.s3a.multipart.size" = "134217728"   # 128 MB
+"spark.hadoop.fs.s3a.fast.upload"    = "true"
+"spark.hadoop.fs.s3a.path.style.access" = "true"
+
+[production.storage]
+type      = "s3"
+base_path = "s3a://s3_bucket/lakehouse"
+
+[production.database]
+host = "postgress.rds.amazonaws.com"
+port = 5432
