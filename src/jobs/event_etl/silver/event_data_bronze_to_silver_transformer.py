@@ -6,7 +6,7 @@ from delta.tables import DeltaTable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-from pyspark.sql.types import TimestampType
+from pyspark.sql.types import TimestampType, StringType
 
 from src.jobs.common.constants import Constants
 from src.jobs.core.base_data_pipeline import BaseDataPipeline
@@ -49,6 +49,7 @@ class EventDataBronzeToSilverTransformer(BaseDataPipeline):
         # Enforce strict data types and map from raw source names
         conformed_df = (
             df
+            .withColumn("event_name", F.col("name").cast(StringType()))
             .withColumn("record_inserted_timestamp", F.col("_created_at").cast(TimestampType()))
             .withColumn("record_last_updated_timestamp", F.col("_updated_at").cast(TimestampType()))
             .drop("_created_at", "_updated_at")
@@ -68,7 +69,7 @@ class EventDataBronzeToSilverTransformer(BaseDataPipeline):
             .withColumn("lh_silver_execution_date", F.to_date(F.lit(self.execution_date)))
             .withColumn("lh_silver_inserted_timestamp", F.current_timestamp())
             .select(
-                "event_id", "organizer_id", "name", "type", "venue", "region", "event_date", "record_inserted_timestamp",
+                "event_id", "organizer_id", "event_name", "type", "venue", "region", "event_date", "record_inserted_timestamp",
                 "record_last_updated_timestamp", "lh_bronze_execution_date", "lh_bronze_inserted_timestamp",
                 "lh_bronze_source_database_table", "lh_silver_execution_date", "lh_silver_inserted_timestamp"
             )
