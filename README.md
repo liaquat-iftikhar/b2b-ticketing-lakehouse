@@ -145,36 +145,33 @@ Services started:
 
 ### 4 — Seed the operational database
 
-The `operational_db_data_loader` DAG does this automatically. Trigger it manually from the Airflow UI, or run it directly:
+**Recommended:** trigger the `operational_db_data_loader` DAG from the Airflow UI at http://localhost:8080. This is a one-off DAG (schedule: `None`) that generates realistic organizers, resellers, customers, events, tickets, and sales records and inserts them directly into PostgreSQL.
 
-```bash
-# Outside Docker (requires local Python venv with psycopg2 installed)
-python -m src.utils.generator.operational_db.orchestrator
+1. Open the Airflow UI → search for `operational_db_data_loader`
+2. Click the ▶ **Trigger DAG** button
+3. Wait for all tasks to turn green
 
-# Inside the scheduler container
-docker exec -it airflow_scheduler \
-  python -m src.utils.generator.operational_db.orchestrator
-```
+> The DAG runs `src/utils/generator/operational_db/orchestrator.py` inside the scheduler container, so no local Python setup is needed.
 
 ### 5 — Generate reseller CSV files
 
-```bash
-# Outside Docker
-python -m src.utils.generator.reseller_vendor_data.orchestrator
+**Recommended:** trigger the `reseller_vendor_data_loader` DAG from the Airflow UI. This DAG generates daily CSV sales files from reseller vendors and writes them to `data/inbound/`, which is the source path for `reseller_sale_data_extractor_dag`.
 
-# Inside the scheduler container
-docker exec -it airflow_scheduler \
-  python -m src.utils.generator.reseller_vendor_data.orchestrator
-```
+1. Open the Airflow UI → search for `reseller_vendor_data_loader`
+2. Click the ▶ **Trigger DAG** button
+3. Wait for all tasks to turn green
 
-CSV files land in `data/inbound/` (mounted into the container at `/opt/airflow/data/inbound/`).
+CSV files land in `data/inbound/` (mounted into the Airflow containers at `/opt/airflow/data/inbound/`).
+
+> Both seeding DAGs only need to be run once before executing the main ETL pipeline.
 
 ### 6 — Run the ETL pipeline
 
-In the Airflow UI (http://localhost:8080) enable and trigger the DAGs in dependency order:
+In the Airflow UI (http://localhost:8080) enable and trigger the DAGs in this order:
 
-1. `operational_db_data_loader` — seeds source DB (one-off, schedule: None)
-2. Entity extractors (run in any order, they are independent):
+1. `operational_db_data_loader` — seeds PostgreSQL source data *(step 4)*
+2. `reseller_vendor_data_loader` — generates reseller CSV files *(step 5)*
+3. Entity extractors — run in any order, they are independent:
    - `organizer_data_extractor_dag`
    - `reseller_data_extractor_dag`
    - `customer_data_extractor_dag`
@@ -183,7 +180,7 @@ In the Airflow UI (http://localhost:8080) enable and trigger the DAGs in depende
    - `commission_agreement_data_extractor_dag`
    - `sale_data_extractor_dag`
    - `reseller_sale_data_extractor_dag`
-3. `sales_report_dag` — builds the Gold layer fact table
+4. `sales_report_dag` — builds the Gold layer fact table (run after all extractors complete)
 
 ### 7 — View the dashboard
 
