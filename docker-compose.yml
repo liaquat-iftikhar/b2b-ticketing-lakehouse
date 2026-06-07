@@ -1,0 +1,172 @@
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment: &airflow-common-env
+    # ---- Airflow core ----
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+
+    # ---- Database (Airflow metadata) ----
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
+      postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+
+    # ---- Security ----
+    AIRFLOW__CORE__FERNET_KEY: "uQ4LmIibVt_mGNVfpVJ_ks7SWr9oEVq7JwkPb5YqWUQ="
+    AIRFLOW__WEBSERVER__SECRET_KEY: "local-dev-secret-do-not-use-in-prod"
+
+    # ---- Spark connection (read by SparkSubmitOperator at task runtime) ----
+    AIRFLOW_CONN_SPARK_LOCAL: '{"conn_type": "spark", "host": "local[*]"}'
+
+    # ---- Project config (Dynaconf) ----
+    PYTHONPATH: /opt/airflow
+    ENV_FOR_DYNACONF: local
+    DYNACONF_DATABASE__HOST: operational-postgres
+    DYNACONF_DATABASE__PORT: "5432"
+    DYNACONF_DATABASE__NAME: event_platform
+    DYNACONF_DATABASE__USER: postgres
+    DYNACONF_DATABASE__PASSWORD: postgres
+    DYNACONF_STORAGE__BASE_PATH: /opt/airflow/data/lakehouse
+
+  volumes:
+    - ./dags:/opt/airflow/dags          # DAG files
+    - ./src:/opt/airflow/src            # ETL source (imported by spark-submit scripts)
+    - ./config:/opt/airflow/config      # Dynaconf settings.toml
+    - ./data:/opt/airflow/data          # inbound files + lakehouse output
+    - airflow_logs:/opt/airflow/logs
+    - airflow_ivy_cache:/home/airflow/.ivy2   # Spark JAR download cache
+
+  networks:
+    - etl_net
+
+  depends_on:
+    airflow-postgres:
+      condition: service_healthy
+    operational-postgres:
+      condition: service_healthy
+
+
+services:
+
+  airflow-postgres:
+    image: postgres:15-alpine
+    container_name: airflow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    ports:
+      - "5433:5432"
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl_net
+
+  operational-postgres:
+    image: postgres:15-alpine
+    container_name: operational_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: event_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - operational_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl_net
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow_init
+    restart: "no"
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    command: bash -c "airflow db migrate && airflow connections add 'spark_default' --conn-type 'spark' --conn-host 'local[*]' || echo 'Spark connection already exists — skipping.'"
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow_webserver
+    restart: unless-stopped
+    command: api-server
+    ports:
+      - "8080:8080"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      operational-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /home/airflow/airflow-api-server.pid ]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: airflow_dag_processor
+    restart: unless-stopped
+    command: dag-processor
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      operational-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow_scheduler
+    restart: unless-stopped
+    command: scheduler
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      operational-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: airflow_triggerer
+    restart: unless-stopped
+    command: triggerer
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      operational-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+
+volumes:
+  airflow_postgres_data:
+  operational_postgres_data:
+  airflow_logs:
+  airflow_ivy_cache:
+
+networks:
+  etl_net:
+    driver: bridge
