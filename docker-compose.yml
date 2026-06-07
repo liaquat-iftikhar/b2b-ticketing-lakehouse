@@ -4,9 +4,25 @@ x-airflow-common: &airflow-common
     dockerfile: Dockerfile.airflow
   environment: &airflow-common-env
     # ---- Airflow core ----
+    AIRFLOW_HOME: /opt/airflow
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+
+    # ---- Airflow 3 Task Execution API Configuration
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver:8080/execution/"
+    AIRFLOW__API_AUTH__JWT_SECRET: "local-dev-jwt-token-secret-key-must-be-32-bytes"
+
+    # ---- Logging ----
+    AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+    AIRFLOW__LOGGING__REMOTE_LOGGING: "false"
+    AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+    AIRFLOW__LOGGING__FAB_LOGGING_LEVEL: WARN
+    AIRFLOW__LOGGING__COLORED_CONSOLE_LOG: "false"
+
+    # ---- Native Automated Connections
+    AIRFLOW_CONN_SPARK_DEFAULT: '{"conn_type": "spark", "host": "local[*]"}'
+    AIRFLOW_CONN_POSTGRES_DEFAULT: '{"conn_type": "postgres", "host": "operational-postgres", "port": 5432, "login": "postgres", "password": "postgres", "schema": "event_platform"}'
 
     # ---- Database (Airflow metadata) ----
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
@@ -15,9 +31,6 @@ x-airflow-common: &airflow-common
     # ---- Security ----
     AIRFLOW__CORE__FERNET_KEY: "uQ4LmIibVt_mGNVfpVJ_ks7SWr9oEVq7JwkPb5YqWUQ="
     AIRFLOW__WEBSERVER__SECRET_KEY: "local-dev-secret-do-not-use-in-prod"
-
-    # ---- Spark connection (read by SparkSubmitOperator at task runtime) ----
-    AIRFLOW_CONN_SPARK_LOCAL: '{"conn_type": "spark", "host": "local[*]"}'
 
     # ---- Project config (Dynaconf) ----
     PYTHONPATH: /opt/airflow
@@ -30,12 +43,12 @@ x-airflow-common: &airflow-common
     DYNACONF_STORAGE__BASE_PATH: /opt/airflow/data/lakehouse
 
   volumes:
-    - ./dags:/opt/airflow/dags          # DAG files
-    - ./src:/opt/airflow/src            # ETL source (imported by spark-submit scripts)
-    - ./config:/opt/airflow/config      # Dynaconf settings.toml
-    - ./data:/opt/airflow/data          # inbound files + lakehouse output
+    - ./dags:/opt/airflow/dags
+    - ./src:/opt/airflow/src
+    - ./config:/opt/airflow/config
+    - ./data:/opt/airflow/data
     - airflow_logs:/opt/airflow/logs
-    - airflow_ivy_cache:/home/airflow/.ivy2   # Spark JAR download cache
+    - airflow_ivy_cache:/home/airflow/.ivy2
 
   networks:
     - etl_net
@@ -48,6 +61,8 @@ x-airflow-common: &airflow-common
 
 
 services:
+
+  # ---------- Databases -------------------------------------------------------
 
   airflow-postgres:
     image: postgres:15-alpine
@@ -89,6 +104,8 @@ services:
     networks:
       - etl_net
 
+  # ---------- Airflow ---------------------------------------------------------
+
   airflow-init:
     <<: *airflow-common
     container_name: airflow_init
@@ -99,7 +116,7 @@ services:
       _AIRFLOW_WWW_USER_CREATE: "true"
       _AIRFLOW_WWW_USER_USERNAME: admin
       _AIRFLOW_WWW_USER_PASSWORD: admin
-    command: bash -c "airflow db migrate && airflow connections add 'spark_default' --conn-type 'spark' --conn-host 'local[*]' || echo 'Spark connection already exists — skipping.'"
+    command: db migrate
 
   airflow-webserver:
     <<: *airflow-common
@@ -116,7 +133,7 @@ services:
       airflow-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "[ -f /home/airflow/airflow-api-server.pid ]"]
+      test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-api-server.pid ]"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -165,13 +182,12 @@ services:
   reporting:
     build:
       context: .
-      dockerfile: Dockerfile.airflow  # Can reuse your PySpark/Java image or a clean python image
+      dockerfile: Dockerfile.airflow
     container_name: streamlit_dashboard
     restart: unless-stopped
     ports:
       - "8501:8501"
     environment:
-      # Pass the baseline Dynaconf context coordinates to the container
       PYTHONPATH: /opt/airflow
       ENV_FOR_DYNACONF: local
       DYNACONF_DATABASE__HOST: operational-postgres
@@ -182,15 +198,16 @@ services:
       DYNACONF_STORAGE__BASE_PATH: /opt/airflow/data/lakehouse
     volumes:
       - ./reporting:/opt/airflow/reporting
-      - ./config:/opt/airflow/config      #  Mounts settings.toml
-      - ./src:/opt/airflow/src            #  Mounts your src modules
-      - ./data:/opt/airflow/data          #  Mounts the shared lakehouse data directories
+      - ./config:/opt/airflow/config
+      - ./src:/opt/airflow/src
+      - ./data:/opt/airflow/data
     command: streamlit run /opt/airflow/reporting/sales_report_dashboard.py
     networks:
       - etl_net
     depends_on:
       operational-postgres:
         condition: service_healthy
+
 
 volumes:
   airflow_postgres_data:

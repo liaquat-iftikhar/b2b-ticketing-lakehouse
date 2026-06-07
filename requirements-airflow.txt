@@ -3,3 +3,4 @@ delta-spark==4.1.0
 dynaconf>=3.2
 psycopg2-binary==2.9.12
 apache-airflow-providers-apache-spark==6.0.2
+apache-airflow-providers-postgres==6.7.0
