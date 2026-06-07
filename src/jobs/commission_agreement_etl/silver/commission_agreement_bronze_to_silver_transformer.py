@@ -6,7 +6,6 @@ from typing import Optional
 from delta.tables import DeltaTable
 from pyspark.sql import functions as F, Window, DataFrame
 from pyspark.sql.types import TimestampType
-
 from src.jobs.common.constants import Constants
 from src.jobs.common.lakehouse_path_resolver import LakehousePathResolver
 from src.jobs.core.base_data_pipeline import BaseDataPipeline
@@ -107,7 +106,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Silver Transformation Script for Commission Agreements")
     parser.add_argument("--execution_date", required=True, help="Target partition date matching format YYYY-MM-DD")
-    parser.add_argument("--lakehouse_base_path", required=True, help="Absolute path to storage layer roots")
+    parser.add_argument("--lakehouse_base_path", default=None,  help="Absolute path to storage layer roots")
     args = parser.parse_args()
 
     transformer = CommissionAgreementBronzeToSilverTransformer(

@@ -123,7 +123,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--lakehouse_base_path",
-        required=True,
+        default=None,
         help="Target base directory system path mapping parameter."
     )
     args = parser.parse_args()

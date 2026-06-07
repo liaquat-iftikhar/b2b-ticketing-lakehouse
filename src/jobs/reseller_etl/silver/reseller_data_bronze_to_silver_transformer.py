@@ -107,7 +107,7 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Lakehouse Resellers Silver Layer Transformer Engine")
     parser.add_argument("--execution_date", required=True)
-    parser.add_argument("--lakehouse_base_path", required=True)
+    parser.add_argument("--lakehouse_base_path", default=None)
     args = parser.parse_args()
 
     transformer = ResellerDataBronzeToSilverTransformer(
