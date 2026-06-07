@@ -4,8 +4,10 @@ from pathlib import Path
 from faker import Faker
 import psycopg2
 
+from src.config.app_config import DatabaseConfig
+from src.config.config_loader import ConfigLoader
 from src.utils.generator.common.base_generator import BaseGeneratorSettings
-from src.utils.generator.operational_db.core.db_connection_manager import DatabaseConfig, DatabaseConnectionManager
+from src.utils.generator.operational_db.core.db_connection_manager import DatabaseConnectionManager
 from src.utils.generator.operational_db.core.db_generator_settings import DBGeneratorSettings
 from src.utils.generator.operational_db.data_generators import (
     OrganizerGenerator,
@@ -86,7 +88,7 @@ class PlatformOrchestrator:
 
 
 if __name__ == "__main__":
-    config = DatabaseConfig()
-    settings = DBGeneratorSettings()
-    orchestrator = PlatformOrchestrator(db_config=config, settings=settings)
-    orchestrator.run()
+    _app_config = ConfigLoader.load()
+    _settings = DBGeneratorSettings()
+    _orchestrator = PlatformOrchestrator(db_config=_app_config.database, settings=_settings)
+    _orchestrator.run()

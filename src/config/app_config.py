@@ -23,8 +23,9 @@ class SparkConfig:
 
 @dataclass(frozen=True)
 class StorageConfig:
-    type:      StorageType
-    base_path: str
+    type:         StorageType
+    base_path:    str
+    inbound_path: str = ""
 
     @property
     def is_s3(self) -> bool:

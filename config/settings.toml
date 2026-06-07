@@ -6,6 +6,7 @@ shuffle_partitions  = 100
 extra_configs       = {}
 
 [default.storage]
+inbound_path = "./data/inbound"
 type      = "local"
 base_path = "/tmp/lakehouse"
 
@@ -20,11 +21,12 @@ driver = "org.postgresql.Driver"
 [local]
 
 [local.storage]
-type      = "local"
-base_path = "./tmp/lakehouse"
+type         = "local"
+base_path    = "./tmp/lakehouse"
+inbound_path = "./data/inbound"
 
 [local.database]
-host = "postgres"
+host = "localhost"
 port = 5432
 
 [production]
@@ -38,8 +40,9 @@ shuffle_partitions = 200
 "spark.hadoop.fs.s3a.path.style.access" = "true"
 
 [production.storage]
-type      = "s3"
-base_path = "s3a://s3_bucket/lakehouse"
+type         = "s3"
+base_path    = "s3a://s3_bucket/lakehouse"
+inbound_path = "s3a://s3_bucket/inbound"
 
 [production.database]
 host = "postgress.rds.amazonaws.com"

@@ -7,8 +7,9 @@ from src.utils.generator.common.base_generator import BaseGeneratorSettings
 
 @dataclass
 class ResellerSalesCSVSettings(BaseGeneratorSettings):
-    """Encapsulates system settings and lookup data using immutable-friendly patterns."""
-    output_dir: str = "data/inbound2"
+    """
+    Data generation parameters for the reseller CSV generator.
+    """
     num_resellers: int = 5
     days_to_generate: int = 10
     sales_per_day: Tuple[int, int] = (5, 20)

@@ -44,6 +44,7 @@ class ConfigLoader:
         return StorageConfig(
             type=StorageType(s.get("type", "local").lower()),
             base_path=s.get("base_path"),
+            inbound_path=s.get("inbound_path", ""),
         )
 
     @classmethod

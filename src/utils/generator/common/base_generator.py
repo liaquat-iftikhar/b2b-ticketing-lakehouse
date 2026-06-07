@@ -12,7 +12,7 @@ class BaseGeneratorSettings:
 class BaseGenerator(ABC):
     """Abstract interface defining standard dependencies and date helpers for entities."""
 
-    def __init__(self, fake: Faker, settings: GeneratorSettings):
+    def __init__(self, fake: Faker, settings: BaseGeneratorSettings):
         self.fake = fake
         self.settings = settings
 
