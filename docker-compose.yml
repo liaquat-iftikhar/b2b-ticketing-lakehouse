@@ -1,7 +1,7 @@
 x-airflow-common: &airflow-common
   build:
     context: .
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.airflow
   environment: &airflow-common-env
     # ---- Airflow core ----
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -160,6 +160,37 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+
+  # ---------- Reporting ------------------------------------------------------
+  reporting:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow  # Can reuse your PySpark/Java image or a clean python image
+    container_name: streamlit_dashboard
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      # Pass the baseline Dynaconf context coordinates to the container
+      PYTHONPATH: /opt/airflow
+      ENV_FOR_DYNACONF: local
+      DYNACONF_DATABASE__HOST: operational-postgres
+      DYNACONF_DATABASE__PORT: "5432"
+      DYNACONF_DATABASE__NAME: event_platform
+      DYNACONF_DATABASE__USER: postgres
+      DYNACONF_DATABASE__PASSWORD: postgres
+      DYNACONF_STORAGE__BASE_PATH: /opt/airflow/data/lakehouse
+    volumes:
+      - ./reporting:/opt/airflow/reporting
+      - ./config:/opt/airflow/config      #  Mounts settings.toml
+      - ./src:/opt/airflow/src            #  Mounts your src modules
+      - ./data:/opt/airflow/data          #  Mounts the shared lakehouse data directories
+    command: streamlit run /opt/airflow/reporting/sales_report_dashboard.py
+    networks:
+      - etl_net
+    depends_on:
+      operational-postgres:
+        condition: service_healthy
 
 volumes:
   airflow_postgres_data:

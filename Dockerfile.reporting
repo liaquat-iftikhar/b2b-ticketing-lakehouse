@@ -1,0 +1,45 @@
+# =============================================================================
+# Reporting container — Streamlit dashboard backed by DuckDB delta_scan().
+#
+# Intentionally lightweight: no Java, no Spark, no Airflow.
+# DuckDB reads Delta Lake parquet files directly from the shared data volume.
+#
+# Build:  docker build -f Dockerfile.reporting -t reporting-dashboard .
+# Run:    docker-compose up reporting
+# URL:    http://localhost:8501
+# =============================================================================
+
+FROM python:3.11-slim
+
+# curl is used by the docker-compose healthcheck
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies first (cached layer — only invalidated on req change)
+COPY requirements-reporting.txt .
+RUN pip install --no-cache-dir -r requirements-reporting.txt
+
+# Copy application source
+# In docker-compose these are overridden by volume mounts for live reloading.
+COPY reporting/ ./reporting/
+COPY src/config/ ./src/config/
+COPY config/     ./config/
+
+# reporting/ and src/ must both be importable as top-level packages
+ENV PYTHONPATH=/app
+ENV ENV_FOR_DYNACONF=local
+
+# Streamlit settings — disable browser auto-open and CORS warnings in Docker
+ENV STREAMLIT_SERVER_PORT=8501
+ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+EXPOSE 8501
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:8501/_stcore/health || exit 1
+
+CMD ["streamlit", "run", "reporting/sales_report_dashboard.py"]
