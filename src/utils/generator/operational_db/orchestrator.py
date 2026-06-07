@@ -4,8 +4,9 @@ from pathlib import Path
 from faker import Faker
 import psycopg2
 
+from src.utils.generator.common.base_generator import BaseGeneratorSettings
 from src.utils.generator.operational_db.core.db_connection_manager import DatabaseConfig, DatabaseConnectionManager
-from src.utils.generator.operational_db.core.generator_settings import GeneratorSettings
+from src.utils.generator.operational_db.core.db_generator_settings import DBGeneratorSettings
 from src.utils.generator.operational_db.data_generators import (
     OrganizerGenerator,
     ResellerGenerator,
@@ -20,7 +21,7 @@ from src.utils.generator.operational_db.data_generators import (
 class PlatformOrchestrator:
     """Orchestrates seed environments and schedules sequential data generation tasks."""
 
-    def __init__(self, db_config: DatabaseConfig, settings: GeneratorSettings):
+    def __init__(self, db_config: DatabaseConfig, settings: BaseGeneratorSettings):
         self._db_config = db_config
         self._settings = settings
         self.logger = logging.getLogger(__name__)
@@ -86,6 +87,6 @@ class PlatformOrchestrator:
 
 if __name__ == "__main__":
     config = DatabaseConfig()
-    settings = GeneratorSettings()
+    settings = DBGeneratorSettings()
     orchestrator = PlatformOrchestrator(db_config=config, settings=settings)
     orchestrator.run()

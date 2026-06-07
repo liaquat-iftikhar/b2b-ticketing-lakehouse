@@ -2,8 +2,11 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import List
 
+from src.utils.generator.common.base_generator import BaseGeneratorSettings
+
+
 @dataclass
-class GeneratorSettings:
+class DBGeneratorSettings(BaseGeneratorSettings):
     """Data generation scale configurations and lookup bounds."""
     num_organizers: int = 10
     num_resellers: int = 20

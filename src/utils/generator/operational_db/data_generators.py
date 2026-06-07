@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Tuple
 
 
-from src.utils.generator.operational_db.core.base_generator import BaseGenerator
+from src.utils.generator.common.base_generator import BaseGenerator
 
 
 class OrganizerGenerator(BaseGenerator):

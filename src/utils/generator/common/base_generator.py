@@ -4,7 +4,9 @@ from datetime import date, timedelta
 from typing import Any
 from faker import Faker
 
-from src.utils.generator.operational_db.core.generator_settings import GeneratorSettings
+
+class BaseGeneratorSettings:
+    pass
 
 
 class BaseGenerator(ABC):
