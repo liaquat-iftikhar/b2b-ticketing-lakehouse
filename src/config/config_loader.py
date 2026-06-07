@@ -1,5 +1,7 @@
-from src.config.app_config import AppConfig, Environment, _dynaconf, SparkConfig, StorageConfig, StorageType, \
-    DatabaseConfig
+from src.config.app_config import (
+    AppConfig, AirflowConfig, Environment, _dynaconf,
+    SparkConfig, StorageConfig, StorageType, DatabaseConfig,
+)
 
 
 class ConfigLoader:
@@ -17,6 +19,7 @@ class ConfigLoader:
             spark=cls._build_spark(),
             storage=cls._build_storage(),
             database=cls._build_database(),
+            airflow=cls._build_airflow(),
         )
 
 
@@ -45,6 +48,14 @@ class ConfigLoader:
             type=StorageType(s.get("type", "local").lower()),
             base_path=s.get("base_path"),
             inbound_path=s.get("inbound_path", ""),
+        )
+
+    @classmethod
+    def _build_airflow(cls) -> AirflowConfig:
+        a = _dynaconf.get("airflow") or {}
+        return AirflowConfig(
+            spark_conn_id=a.get("spark_conn_id", "spark_local"),
+            postgres_conn_id=a.get("postgres_conn_id", "postgres_event_platform"),
         )
 
     @classmethod

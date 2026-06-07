@@ -1,18 +1,14 @@
 import os
 from datetime import datetime, timedelta
-from pathlib import Path
 from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 
 from common.datasets import RESELLER_SALE_DATA_EXTRACTOR_DAG_SUCCESS_DATASET
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SPARK_CONN_ID = "spark_local"
-
-LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
-INBOUND_PATH = PROJECT_ROOT / "data" / "inbound"
-SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
+from common.dag_config import (
+    SPARK_CONN_ID,
+    LAKEHOUSE_PATH, INBOUND_PATH, PROJECT_ROOT, SRC_JOBS_ROOT,
+)
 
 
 

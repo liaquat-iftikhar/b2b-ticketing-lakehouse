@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from src.config.app_config import DatabaseConfig
 from src.jobs.common.constants import Constants
 from src.jobs.core.base_data_pipeline import BaseDataPipeline
 from src.jobs.core.bronze.db_config_manager import DBConnectionManager, JDBCPartitionConfig
@@ -114,7 +115,16 @@ if __name__ == "__main__":
     os.environ["DB_DRIVER"] = args.db_driver
     os.environ["DB_DRIVER"] = args.db_driver
 
-    conn_manager = DBConnectionManager()
+    db_config = DatabaseConfig(
+        host=args.db_host,
+        port=int(args.db_port),
+        user=args.db_user,
+        password=args.db_password,
+        name="event_platform",  # Target source transaction database name
+        driver="org.postgresql.Driver"
+    )
+
+    conn_manager = DBConnectionManager(db_config=db_config)
 
     # tuning_strategy = JDBCPartitionConfig(
     #     column="id",

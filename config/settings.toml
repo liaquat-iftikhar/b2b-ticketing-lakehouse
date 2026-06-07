@@ -17,6 +17,10 @@ name   = "event_platform"
 user   = "postgres"
 driver = "org.postgresql.Driver"
 
+[default.airflow]
+spark_conn_id    = "spark_local"
+postgres_conn_id = "postgres_event_platform"
+
 
 [local]
 

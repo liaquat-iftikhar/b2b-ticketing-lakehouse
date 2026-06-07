@@ -58,11 +58,19 @@ class DatabaseConfig:
 
 
 @dataclass(frozen=True)
+class AirflowConfig:
+    """Airflow connection IDs — names must match connections registered in Airflow."""
+    spark_conn_id:    str = "spark_local"
+    postgres_conn_id: str = "postgres_event_platform"
+
+
+@dataclass(frozen=True)
 class AppConfig:
     environment: Environment
     spark:       SparkConfig
     storage:     StorageConfig
     database:    DatabaseConfig
+    airflow:     AirflowConfig = field(default_factory=AirflowConfig)
 
 
 _PROJECT_ROOT = Path(__file__).parents[2]

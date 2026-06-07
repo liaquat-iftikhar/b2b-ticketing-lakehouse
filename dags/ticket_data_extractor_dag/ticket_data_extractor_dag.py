@@ -1,18 +1,15 @@
 import os
 from datetime import datetime, timedelta
-from pathlib import Path
 from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 
 from common.datasets import TICKET_DATA_EXTRACTOR_DAG_SUCCESS_DATASET
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SPARK_CONN_ID = "spark_local"
-POSTGRES_CONN_ID = "postgres_event_platform"
-
-LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
-SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
+from common.dag_config import (
+    SPARK_CONN_ID, POSTGRES_CONN_ID,
+    LAKEHOUSE_PATH, PROJECT_ROOT, SRC_JOBS_ROOT,
+    PYSPARK_PYTHON, PYSPARK_DRIVER_PYTHON,
+)
 
 TABLE_NAME = "ticket"
 
@@ -43,8 +40,8 @@ with DAG(
 
         env_vars={
             "PYTHONPATH": os.getenv("PYTHONPATH", str(PROJECT_ROOT)),
-            "PYSPARK_PYTHON": str(PROJECT_ROOT / ".venv" / "bin" / "python"),
-            "PYSPARK_DRIVER_PYTHON": str(PROJECT_ROOT / ".venv" / "bin" / "python")
+            "PYSPARK_PYTHON": PYSPARK_PYTHON,
+            "PYSPARK_DRIVER_PYTHON": PYSPARK_DRIVER_PYTHON,
         },
 
         packages="io.delta:delta-spark_2.13:4.1.0,org.postgresql:postgresql:42.7.3",
