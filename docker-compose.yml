@@ -23,6 +23,8 @@ x-airflow-common: &airflow-common
     # ---- Airflow connections (names must match conn IDs in settings.toml [default.airflow]) ----
     AIRFLOW_CONN_SPARK_LOCAL: '{"conn_type": "spark", "host": "local[*]"}'
     AIRFLOW_CONN_POSTGRES_EVENT_PLATFORM: '{"conn_type": "postgres", "host": "operational-postgres", "port": 5432, "login": "postgres", "password": "postgres", "schema": "event_platform"}'
+    AIRFLOW_CONN_SPARK_DEFAULT: '{"conn_type": "spark", "host": "local[*]", "extra": {"spark.pyspark.python": "/usr/local/bin/python3", "spark.pyspark.driver.python": "/usr/local/bin/python3", "spark.jars.ivy": "/home/airflow/.ivy2"}}'
+    AIRFLOW_CONN_POSTGRES_DEFAULT: '{"conn_type": "postgres", "host": "operational-postgres", "port": 5432, "login": "postgres", "password": "postgres", "schema": "event_platform"}'
 
     # ---- Database (Airflow metadata) ----
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-

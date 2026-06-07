@@ -4,7 +4,7 @@ import logging
 from typing import Optional, Tuple
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import DoubleType, IntegerType
+from pyspark.sql.types import DoubleType, IntegerType, StringType
 
 from delta.tables import DeltaTable
 
@@ -59,7 +59,7 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
         # Standardize schema definitions across multi-channel structures
         df_conformed = (
             df
-            .withColumn("transaction_id", F.col("transaction_id").cast(IntegerType()))
+            .withColumn("transaction_id", F.col("transaction_id").cast(StringType()))
             .withColumn("event_name", F.col("Event_name"))
             .withColumn("tickets_count", F.col("Number_of_purchased_tickets").cast(IntegerType()))
             .withColumn("raw_amount", F.col("Total_amount").cast("string"))
