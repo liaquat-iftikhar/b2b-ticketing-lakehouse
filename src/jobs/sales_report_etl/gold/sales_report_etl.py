@@ -127,6 +127,7 @@ class SalesReportETL(BaseDataPipeline):
                 F.col("res_sale.customer_first_name"),
                 F.col("res_sale.customer_last_name"),
                 F.col("res_sale.reseller_id"),
+                F.col("res_sale.sale_date"),
                 F.col("res_sale.office_location").alias("reseller_location"),
                 F.lit("csv_import").alias("source")
             )
@@ -153,6 +154,7 @@ class SalesReportETL(BaseDataPipeline):
             F.col("customer.first_name").alias("customer_first_name"),
             F.col("customer.last_name").alias("customer_last_name"),
             F.col("sale.reseller_id"),
+            F.col("sale.sale_date"),
             F.col("reseller.country").alias("reseller_location"),
             F.lit("platform").alias("source"),
         )

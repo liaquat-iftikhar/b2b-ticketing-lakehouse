@@ -45,7 +45,6 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
 
         self.logger.info("Reading raw datasets from Bronze Delta table: %s", bronze_src)
 
-        # CHANGED: Read format switched from parquet to delta
         df_bronze = self.spark.read.format("delta").load(bronze_src)
 
         df_slice = df_bronze.filter((F.col("lh_bronze_execution_date") == self.execution_date))
@@ -71,6 +70,7 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
             .withColumn("customer_first_name", F.col("Customer_first_name"))
             .withColumn("customer_last_name", F.col("Customer_last_name"))
             .withColumn("created_date", F.col("Created_Date"))
+            .withColumn("sale_date", F.to_date(F.col("sale_date"), "MMddyyyy"))
         )
 
         # Isolate Type-Cast Failures
@@ -114,8 +114,8 @@ class ResellerDataBronzeToSilverTransformer(BaseDataPipeline):
             df_clean_base
             .dropDuplicates(["transaction_id", "reseller_id"])
             .select(
-                "transaction_id", "reseller_id", "event_name", "tickets_count", "net_revenue", "sales_channel", "office_location",
-                "customer_first_name", "customer_last_name", "created_date"
+                "transaction_id", "reseller_id", "event_name", "tickets_count", "net_revenue", "sale_date",
+                "sales_channel", "office_location", "customer_first_name", "customer_last_name", "created_date"
             )
             .withColumn("lh_silver_execution_date", F.to_date(F.lit(self.execution_date)))
             .withColumn("lh_silver_inserted_timestamp", F.current_timestamp())

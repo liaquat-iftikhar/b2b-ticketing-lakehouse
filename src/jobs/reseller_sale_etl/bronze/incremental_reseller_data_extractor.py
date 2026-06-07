@@ -69,11 +69,13 @@ class IncrementalResellerDataExtractor(BaseDataPipeline):
 
         file_path_uri = F.input_file_name()
         reseller_id_regex = r"DailySales_[^_]+_([^.]+)"
+        date_regex = r"DailySales_(\d{8})_"
 
         enriched_stream_df = (
             sanitized_df
             .withColumn("input_file_name", file_path_uri)
             .withColumn("reseller_id", F.regexp_extract(file_path_uri, reseller_id_regex, 1))
+            .withColumn("sale_date", F.regexp_extract(file_path_uri, date_regex, 1))
             .withColumn("lh_bronze_execution_date", F.to_date(F.lit(self.execution_date)))
             .withColumn("lh_bronze_inserted_timestamp", F.current_timestamp())
         )
