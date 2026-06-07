@@ -21,7 +21,7 @@ driver = "org.postgresql.Driver"
 
 [local.storage]
 type      = "local"
-base_path = "/tmp/lakehouse"
+base_path = "./tmp/lakehouse"
 
 [local.database]
 host = "postgres"

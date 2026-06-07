@@ -1,10 +1,13 @@
-import os
 from dataclasses import dataclass
 from typing import Dict
+
+from src.config.app_config import DatabaseConfig
 
 
 @dataclass(frozen=True)
 class JDBCPartitionConfig:
+    """Defines parallel read boundaries for a JDBC source table."""
+
     column: str
     lower_bound: str
     upper_bound: str
@@ -15,34 +18,22 @@ class JDBCPartitionConfig:
             "column": self.column,
             "lower_bound": self.lower_bound,
             "upper_bound": self.upper_bound,
-            "num_partitions": self.num_partitions
+            "num_partitions": self.num_partitions,
         }
 
 
 class DBConnectionManager:
     """
     Handles secure credential acquisition and connection parameter management.
-    Abstracts environment differences between local Docker and Cloud Orchestrators.
     """
-    def __init__(self) -> None:
-        # DE Best Practice: Never hardcode secrets. Read from environment with fallback defaults.
-        self._user = os.getenv("DB_USER", "postgres")
-        self._password = os.getenv("DB_PASSWORD", "postgres")
-        self._host = os.getenv("DB_HOST", "localhost")
-        self._port = os.getenv("DB_PORT", "5432")
-        self._db_name = os.getenv("DB_NAME", "event_platform")
-        self._driver = os.getenv("DB_DRIVER", "org.postgresql.Driver")
+
+    def __init__(self, db_config: DatabaseConfig) -> None:
+        self._config = db_config
 
     @property
     def jdbc_url(self) -> str:
-        """Dynamically constructs the destination host connection string string."""
-        return f"jdbc:postgresql://{self._host}:{self._port}/{self._db_name}"
+        return self._config.jdbc_url
 
     @property
     def db_properties(self) -> Dict[str, str]:
-        """Compiles standard driver execution properties safely wrapper."""
-        return {
-            "user": self._user,
-            "password": self._password,
-            "driver": self._driver
-        }
+        return self._config.jdbc_properties

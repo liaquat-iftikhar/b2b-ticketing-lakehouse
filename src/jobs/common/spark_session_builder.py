@@ -1,87 +1,76 @@
 import os
 import logging
-from typing import Optional, Dict
 from pyspark.sql import SparkSession
 from delta import configure_spark_with_delta_pip
+
+from src.config.app_config import SparkConfig, StorageConfig, StorageType
 
 
 class SparkSessionFactory:
     """
-    A factory class responsible for configuring and instantiating SparkSession contexts.
-    Supports modular configuration adjustments for local disk execution and AWS cloud S3.
+    Get or creates a SparkSession.
     """
 
-    def __init__(
-            self,
-            app_name: str,
-            target_dir: Optional[str] = None,
-            extra_configs: Optional[Dict[str, str]] = None
-    ) -> None:
-        self.app_name = app_name
-        self.target_dir = target_dir
-        self.extra_configs = extra_configs or {}
-        self.logger = logging.getLogger(__name__)
+    _POSTGRES_JAR = "org.postgresql:postgresql:42.7.3"
+    _HADOOP_AWS_JARS = [
+        "org.apache.hadoop:hadoop-aws:3.3.4",
+        "com.amazonaws:aws-java-sdk-bundle:1.12.262",
+    ]
 
-    def _apply_s3_configurations(self, builder: SparkSession.Builder) -> SparkSession.Builder:
-        """Helper to inject Hadoop-AWS file system drivers and security tokens."""
-        self.logger.info("Cloud storage target detected. Injecting Hadoop-AWS driver configs...")
 
-        return (
-            builder
-            .config("spark.hadoop.fs.s3a.access.key", os.getenv("AWS_ACCESS_KEY_ID"))
-            .config("spark.hadoop.fs.s3a.secret.key", os.getenv("AWS_SECRET_ACCESS_KEY"))
-            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-            .config("spark.hadoop.fs.s3a.aws.credentials.provider",
-                    "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
-        )
+    def __init__(self, spark_config: SparkConfig, storage_config: StorageConfig) -> None:
+        self._spark_config = spark_config
+        self._storage_config = storage_config
+        self._logger = logging.getLogger(__name__)
+
 
     def get_or_create(self) -> SparkSession:
-        """
-        Compiles all properties and initializes an active SparkSession context engine.
-        """
-        self.logger.info("Compiling initialization matrix for application context: '%s'", self.app_name)
-        builder = SparkSession.builder.appName(self.app_name)
+        """Build and return an active SparkSession."""
+        self._logger.info("Initialising SparkSession for app '%s'", self._spark_config.app_name)
+        builder = SparkSession.builder.appName(self._spark_config.app_name)
+        jar_packages = [self._POSTGRES_JAR]
 
-        # 1. Initialize a master package registry list for external JARs
-        # Start with your required PostgreSQL JDBC driver package coordinate
-        jar_packages = ["org.postgresql:postgresql:42.7.3"]
-
-        # 2. Automagic Execution Topology Evaluation
-        if self.target_dir and self.target_dir.startswith("s3a://"):
-            builder = self._apply_s3_configurations(builder)
-            # Safe append: Merges cloud dependencies without causing key collision overrides
-            jar_packages.extend([
-                "org.apache.hadoop:hadoop-aws:3.3.4",
-                "com.amazonaws:aws-java-sdk-bundle:1.12.262"
-            ])
+        if self._storage_config.type == StorageType.S3:
+            builder = self._apply_s3_configs(builder)
+            jar_packages.extend(self._HADOOP_AWS_JARS)
         else:
-            self.logger.info("Local file system target detected. Setting multithread master allocations...")
-            builder.master("local[*]")
+            self._logger.info("Local storage detected — setting master to local[*]")
+            builder = builder.master("local[*]")
 
-        # 3. Compile Core Spark Engine Properties (excluding raw jar package strings)
-        compiled_configs = {
-            # Turn on Adaptive Query Execution
-            "spark.sql.adaptive.enabled": "true",
-            "spark.sql.adaptive.coalescePartitions.enabled": "true",
-            "spark.sql.shuffle.partitions": "100",
-            # Delta Lake low-level catalog configurations
-            "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
-            "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
-            **self.extra_configs
-        }
-
-        for config_key, config_value in compiled_configs.items():
-            self.logger.debug("Applying custom config rule: %s = %s", config_key, config_value)
-            builder.config(config_key, config_value)
+        for key, value in self._build_core_configs().items():
+            builder = builder.config(key, value)
 
         try:
-            # 4. FIX: Forward the collected jar list explicitly to the Delta wrapper ecosystem
-            self.logger.info("Injecting unified dependency array into Delta configuration wrapper...")
-            session = configure_spark_with_delta_pip(builder, extra_packages=jar_packages).getOrCreate()
-
-            self.logger.info("SparkSession context successfully built (Spark version: %s).", session.version)
+            session = configure_spark_with_delta_pip(
+                builder, extra_packages=jar_packages
+            ).getOrCreate()
+            self._logger.info("SparkSession ready (Spark %s)", session.version)
             return session
         except Exception as exc:
-            self.logger.critical("Fatal initialization failure: Could not build active SparkContext. Details: %s", exc,
-                                 exc_info=True)
-            raise RuntimeError("Spark Context instantiation failed.") from exc
+            self._logger.critical("SparkSession initialisation failed: %s", exc, exc_info=True)
+            raise RuntimeError("Failed to build SparkSession.") from exc
+
+    def _apply_s3_configs(self, builder: SparkSession.Builder) -> SparkSession.Builder:
+        """Inject Hadoop-AWS credentials and filesystem settings."""
+        self._logger.info("Applying S3/Hadoop-AWS configurations...")
+        return (
+            builder
+            .config("spark.hadoop.fs.s3a.access.key", os.getenv("AWS_ACCESS_KEY_ID", ""))
+            .config("spark.hadoop.fs.s3a.secret.key", os.getenv("AWS_SECRET_ACCESS_KEY", ""))
+            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+            .config(
+                "spark.hadoop.fs.s3a.aws.credentials.provider",
+                "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
+            )
+        )
+
+    def _build_core_configs(self) -> dict:
+        """Assemble the base Spark + Delta Lake configuration map."""
+        return {
+            "spark.sql.adaptive.enabled": "true",
+            "spark.sql.adaptive.coalescePartitions.enabled": "true",
+            "spark.sql.shuffle.partitions": str(self._spark_config.shuffle_partitions),
+            "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
+            "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+            **self._spark_config.extra_configs,
+        }

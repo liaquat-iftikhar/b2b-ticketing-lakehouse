@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Dict
-
 from dynaconf import Dynaconf
 
 class Environment(str, Enum):
@@ -68,12 +67,14 @@ class AppConfig:
 _PROJECT_ROOT = Path(__file__).parents[2]
 
 _dynaconf = Dynaconf(
-    root_path        = str(_PROJECT_ROOT),
-    envvar_prefix    = "DYNACONF",
-    settings_files   = ["config/settings.toml", "config/.secrets.toml"],
-    environments     = True,
-    env_switcher     = "ENV_FOR_DYNACONF",
-    default_env      = "local",
-    load_dotenv      = True,
-    dotenv_path      = ".env",
+    root_path=str(_PROJECT_ROOT),
+    envvar_prefix="DYNACONF",
+    settings_files=["config/settings.toml", "config/.secrets.toml"],
+    environments=True,
+    env_switcher="ENV_FOR_DYNACONF",
+    default_env="default",
+    env="local",
+    load_dotenv=True,
+    dotenv_path=".env",
+    nested_match=True,
 )

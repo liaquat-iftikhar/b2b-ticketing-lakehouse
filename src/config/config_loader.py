@@ -1,11 +1,5 @@
-from dataclasses import dataclass, field
-from enum import Enum
-from pathlib import Path
-from typing import Dict
-
-from dynaconf import Dynaconf
-
-from app_config import AppConfig, Environment, _dynaconf, SparkConfig, StorageConfig, StorageType, DatabaseConfig
+from src.config.app_config import AppConfig, Environment, _dynaconf, SparkConfig, StorageConfig, StorageType, \
+    DatabaseConfig
 
 
 class ConfigLoader:
@@ -15,42 +9,54 @@ class ConfigLoader:
 
     @classmethod
     def load(cls) -> AppConfig:
+
+        current_env_raw = _dynaconf.get("current_env", "local")
+
         return AppConfig(
-            environment = Environment(_dynaconf.current_env.lower()),
-            spark       = cls._build_spark(),
-            storage     = cls._build_storage(),
-            database    = cls._build_database(),
+            environment=Environment(current_env_raw.lower()),
+            spark=cls._build_spark(),
+            storage=cls._build_storage(),
+            database=cls._build_database(),
         )
 
-    # ------------------------------------------------------------------
-    # Private builders
-    # ------------------------------------------------------------------
 
     @classmethod
     def _build_spark(cls) -> SparkConfig:
-        s = _dynaconf.spark
+        s = _dynaconf.get("spark")
+        if not s:
+            raise KeyError(
+                f"Configuration Loading Error: The '[spark]' block is missing. "
+                f"Active environment profile is [{_dynaconf.current_env}]."
+            )
+
         return SparkConfig(
-            app_name           = s.app_name,
-            shuffle_partitions = int(s.shuffle_partitions),
-            extra_configs      = dict(s.get("extra_configs") or {}),
+            app_name=s.get("app_name", "lakehouse_etl_pipeline"),
+            shuffle_partitions=int(s.get("shuffle_partitions", 100)),
+            extra_configs=dict(s.get("extra_configs") or {}),
         )
 
     @classmethod
     def _build_storage(cls) -> StorageConfig:
-        s = _dynaconf.storage
+        s = _dynaconf.get("storage")
+        if not s:
+            raise KeyError("Configuration Loading Error: The '[storage]' block is missing.")
+
         return StorageConfig(
-            type      = StorageType(s.type),
-            base_path = s.base_path,
+            type=StorageType(s.get("type", "local").lower()),
+            base_path=s.get("base_path"),
         )
 
     @classmethod
     def _build_database(cls) -> DatabaseConfig:
-        d = _dynaconf.database
+        d = _dynaconf.get("database")
+        if not d:
+            raise KeyError("Configuration Loading Error: The '[database]' block is missing.")
+
         return DatabaseConfig(
-            host     = d.host,
-            port     = int(d.port),
-            name     = d.name,
-            user     = d.user,
-            password = d.password,
-            driver   = d.get("driver", "org.postgresql.Driver"),
+            host=d.get("host"),
+            port=int(d.get("port")),
+            name=d.get("name"),
+            user=d.get("user"),
+            password=d.get("password"),
+            driver=d.get("driver", "org.postgresql.Driver"),
         )
