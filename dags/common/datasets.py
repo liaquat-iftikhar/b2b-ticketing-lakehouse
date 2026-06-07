@@ -10,3 +10,5 @@ COMMISSION_AGREEMENT_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(
 EVENT_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(f"org.iftikhar.com/event_data_extractor_dag/success")
 TICKET_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(f"org.iftikhar.com/ticket_data_extractor_dag/success")
 SALES_REPORT_DAG_SUCCESS_DATASET = Dataset(f"org.iftikhar.com/sales_report_dag/success")
+OPERATIONAL_DB_DATA_LOADER_DAG_SUCCESS_DATASET = Dataset(f"org.iftikhar.com/operational_db_data_loader/success")
+RESELLER_VENDOR_DATA_LOADER_DAG_SUCCESS_DATASET = Dataset(f"org.iftikhar.com/reseller_vendor_data_loader/success")
