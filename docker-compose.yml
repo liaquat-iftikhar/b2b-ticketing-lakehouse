@@ -182,9 +182,10 @@ services:
   reporting:
     build:
       context: .
-      dockerfile: Dockerfile.airflow
+      dockerfile: Dockerfile.reporting
     container_name: streamlit_dashboard
     restart: unless-stopped
+    entrypoint: []
     ports:
       - "8501:8501"
     environment:
