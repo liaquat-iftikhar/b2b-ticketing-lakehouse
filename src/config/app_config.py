@@ -31,7 +31,7 @@ class StorageConfig:
         return self.type == StorageType.S3
 
     def layer_path(self, layer: str, dataset: str) -> str:
-        return f"{self.base_path.rstrip('/')}/{layer.lower()}/{dataset}"
+        return f"{self.base_path.rstrip('/')}/{dataset}/{layer.lower()}"
 
 
 @dataclass(frozen=True)
