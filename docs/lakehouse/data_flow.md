@@ -170,15 +170,15 @@ flowchart LR
 
 **Upsert key per entity:**
 
-| Entity | Merge key |
-|---|---|
-| organizer | `organizer_id` |
-| reseller | `reseller_id` |
-| customer | `customer_id` |
-| event | `event_id` |
-| ticket | `ticket_id` |
-| commission_agreement | `agreement_id` |
-| sale | `sale_id AND reseller_id IS NOT DISTINCT FROM` |
+| Entity | Merge key              |
+|---|------------------------|
+| organizer | `organizer_id`         |
+| reseller | `reseller_id`          |
+| customer | `customer_id`          |
+| event | `event_id`             |
+| ticket | `ticket_id`            |
+| commission_agreement | `agreement_id`         |
+| sale | `sale_id, reseller_id` |
 
 Two Silver lineage columns are added:
 
