@@ -85,49 +85,15 @@ A medallion-architecture data platform for a B2B event ticketing business. Opera
 |------|---------|
 | Docker Desktop | ≥ 4.x |
 | Docker Compose | ≥ 2.x (bundled with Desktop) |
-| Python | 3.12+ (for running generators/scripts outside Docker) |
 
 ### 1 — Clone and configure secrets
 
 ```bash
 git clone <repo-url>
 cd Iftikhar-liaquat
-
-# Create config/.secrets.toml fill in passwords
 ```
 
-`config/.secrets.toml` minimum content:
-
-```toml
-[default.database]
-password = "postgres"
-
-[local.database]
-password = "postgres"
-```
-
-### 2 — Create the local `.env` file
-
-```bash
-cp .env.example .env   # if an example exists, otherwise create:
-```
-
-`.env` contents (local dev defaults — do **not** commit):
-
-```dotenv
-ENV_FOR_DYNACONF=local
-
-DYNACONF_DATABASE__PORT=5432
-DYNACONF_DATABASE__NAME=event_platform
-DYNACONF_DATABASE__USER=postgres
-DYNACONF_DATABASE__PASSWORD=postgres
-```
-
-> **Note:** `DYNACONF_DATABASE__HOST` is intentionally omitted from `.env`.  
-> Locally it defaults to `localhost` (from `settings.toml [local]`).  
-> Inside Docker it is overridden to `operational-postgres` via `docker-compose.yml`.
-
-### 3 — Build and start the full stack
+### 2 — Build and start the full stack
 
 ```bash
 docker compose build --no-cache   # first time or after Dockerfile changes
@@ -143,7 +109,7 @@ Services started:
 | `airflow-postgres` | localhost:5433 | Airflow metadata DB |
 | `reporting` | http://localhost:8501 | Streamlit BI dashboard |
 
-### 4 — Seed the operational database
+### 3 — Seed the operational database
 
 **Recommended:** trigger the `operational_db_data_loader` DAG from the Airflow UI at http://localhost:8080. This is a one-off DAG (schedule: `None`) that generates realistic organizers, resellers, customers, events, tickets, and sales records and inserts them directly into PostgreSQL.
 
@@ -153,7 +119,7 @@ Services started:
 
 > The DAG runs `src/utils/generator/operational_db/orchestrator.py` inside the scheduler container, so no local Python setup is needed.
 
-### 5 — Generate reseller CSV files
+### 4 — Generate reseller CSV files
 
 **Recommended:** trigger the `reseller_vendor_data_loader` DAG from the Airflow UI. This DAG generates daily CSV sales files from reseller vendors and writes them to `data/inbound/`, which is the source path for `reseller_sale_data_extractor_dag`.
 
@@ -165,13 +131,10 @@ CSV files land in `data/inbound/` (mounted into the Airflow containers at `/opt/
 
 > Both seeding DAGs only need to be run once before executing the main ETL pipeline.
 
-### 6 — Run the ETL pipeline
+### 5 — Run the ETL pipeline
 
 In the Airflow UI (http://localhost:8080) enable and trigger the DAGs in this order:
-
-1. `operational_db_data_loader` — seeds PostgreSQL source data *(step 4)*
-2. `reseller_vendor_data_loader` — generates reseller CSV files *(step 5)*
-3. Entity extractors — run in any order, they are independent:
+1. Entity extractors — run in any order, they are independent:
    - `organizer_data_extractor_dag`
    - `reseller_data_extractor_dag`
    - `customer_data_extractor_dag`
@@ -180,9 +143,9 @@ In the Airflow UI (http://localhost:8080) enable and trigger the DAGs in this or
    - `commission_agreement_data_extractor_dag`
    - `sale_data_extractor_dag`
    - `reseller_sale_data_extractor_dag`
-4. `sales_report_dag` — builds the Gold layer fact table (run after all extractors complete)
+2. `sales_report_dag` — builds the Gold layer fact table (run after all extractors complete)
 
-### 7 — View the dashboard
+### 6 — View the dashboard
 
 Open http://localhost:8501 — the Streamlit dashboard reads Gold layer Delta files directly via DuckDB (no Spark required at query time).
 
