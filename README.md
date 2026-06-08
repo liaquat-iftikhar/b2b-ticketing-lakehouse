@@ -61,9 +61,10 @@ A medallion-architecture data platform for a B2B event ticketing business. Opera
 ├── docs/
 │   ├── lakehouse/
 │   │   └── data_flow.md       # Medallion architecture data flow diagrams
-│   └── operational_db/
-│       ├── erd.md             # Entity-relationship diagram
-│       └── data_dictionary.md # Column-level documentation for all tables
+│   ├── operational_db/
+│   │    ├── erd.md             # Entity-relationship diagram
+│   │    └── data_dictionary.md # Column-level documentation for all tables
+│   └── platform_enhancements_roadmap.md # Purposed Enhancement to the data platform
 ├── src/
 │   ├── config/
 │   │   ├── app_config.py      # Typed dataclasses (AppConfig, SparkConfig, …)
