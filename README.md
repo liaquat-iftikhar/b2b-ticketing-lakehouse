@@ -58,6 +58,12 @@ A medallion-architecture data platform for a B2B event ticketing business. Opera
 │   │   ├── dag_config.py      # Single import for all DAG constants
 │   │   └── datasets.py        # Airflow Dataset triggers
 │   └── <entity>_dag/          # One DAG per entity (organizer, customer, …)
+├── docs/
+│   ├── lakehouse/
+│   │   └── data_flow.md       # Medallion architecture data flow diagrams
+│   └── operational_db/
+│       ├── erd.md             # Entity-relationship diagram
+│       └── data_dictionary.md # Column-level documentation for all tables
 ├── src/
 │   ├── config/
 │   │   ├── app_config.py      # Typed dataclasses (AppConfig, SparkConfig, …)
@@ -66,6 +72,16 @@ A medallion-architecture data platform for a B2B event ticketing business. Opera
 │   │   ├── core/              # BaseDataPipeline ABC + SparkSessionFactory
 │   │   └── <entity>_etl/      # Bronze / Silver / Gold PySpark jobs per entity
 │   └── utils/generator/       # Fake-data generators for local dev seeding
+├── tests/
+│   ├── unit/
+│   │   └── jobs/
+│   │       └── reseller_etl/
+│   │           └── bronze/
+│   │               └── test_incremental_reseller_data_extractor.py
+│   └── integration/
+│       └── dags/
+│           └── reseller_data_extractor_dag/
+│               └── test_reseller_data_extractor_dag.py
 ├── reporting/
 │   └── sales_report_dashboard.py   # Streamlit dashboard
 ├── Dockerfile.airflow         # Airflow + Java 17 + PySpark image
@@ -74,6 +90,13 @@ A medallion-architecture data platform for a B2B event ticketing business. Opera
 ├── requirements-airflow.txt   # Airflow container deps
 └── requirements-reporting.txt # Reporting container deps
 ```
+
+> **Where does ETL data go?**  
+> With the default Docker config (`DYNACONF_STORAGE__BASE_PATH: /opt/airflow/data/lakehouse`),
+> the Airflow containers write all Delta Lake files to `/opt/airflow/data/` inside the container.
+> This path is bind-mounted from `./data/` in the project root via `docker-compose.yml`,
+> so everything lands directly on your host machine under `data/lakehouse/`.
+> The `data/` folder does not exist until you run the first ETL DAG — it is created automatically.
 
 ---
 
