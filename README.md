@@ -85,6 +85,7 @@ A medallion-architecture data platform for a B2B event ticketing business. Opera
 |------|---------|
 | Docker Desktop | ≥ 4.x |
 | Docker Compose | ≥ 2.x (bundled with Desktop) |
+| Python | 3.12+ (for running generators/scripts outside Docker) |
 
 ### 1 — Clone and configure secrets
 
@@ -199,6 +200,84 @@ Examples:
 DYNACONF_DATABASE__HOST=my-rds-host.amazonaws.com
 DYNACONF_STORAGE__BASE_PATH=s3a://my-bucket/lakehouse
 DYNACONF_DATABASE__PASSWORD=supersecret
+```
+
+---
+
+## Running Tests
+
+### Prerequisites
+
+Install test dependencies into your local virtual environment (the same one used for local dev):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-airflow.txt
+```
+
+> The integration tests need Airflow and its providers installed — both are already in `requirements-airflow.txt`.
+
+---
+
+### Unit Tests
+
+Unit tests live in `tests/unit/` and test individual PySpark job classes in isolation.
+
+Required env vars:
+
+```bash
+export ENV_FOR_DYNACONF=local
+export DYNACONF_DATABASE__HOST=localhost
+export DYNACONF_DATABASE__PORT=5432
+export DYNACONF_DATABASE__NAME=event_platform
+export DYNACONF_DATABASE__USER=postgres
+export DYNACONF_DATABASE__PASSWORD=postgres
+```
+
+```bash
+# Run all unit tests
+python -m unittest discover -s tests/unit -p "test_*.py" -v
+
+# Run a specific module
+python -m unittest tests.unit.jobs.reseller_etl.bronze.test_incremental_reseller_data_extractor -v
+```
+
+---
+
+### Integration Tests
+
+Integration tests live in `tests/integration/` and validate Airflow DAG structure, task wiring, and operator 
+configuration by loading each DAG through `DagBag` — exactly how Airflow loads them in production.
+
+Required env vars:
+
+```bash
+export ENV_FOR_DYNACONF=local
+export DYNACONF_DATABASE__HOST=localhost
+export DYNACONF_DATABASE__PORT=5432
+export DYNACONF_DATABASE__NAME=event_platform
+export DYNACONF_DATABASE__USER=postgres
+export DYNACONF_DATABASE__PASSWORD=postgres
+```
+
+```bash
+# Run all integration tests
+PYTHONPATH=. python -m unittest discover -s tests/integration -p "test_*.py" -v
+
+# Run the reseller DAG integration test specifically
+PYTHONPATH=. python -m unittest tests.integration.dags.reseller_data_extractor_dag.test_reseller_data_extractor_dag -v
+```
+
+The `PYTHONPATH=.` prefix ensures both the project root (`src/`) and `dags/common/` are importable, 
+which mirrors how the Airflow scheduler container is configured.
+
+---
+
+### Run All Tests
+
+```bash
+PYTHONPATH=. python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
 ---
