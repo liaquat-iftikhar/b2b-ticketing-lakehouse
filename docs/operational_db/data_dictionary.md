@@ -132,14 +132,14 @@ Represents a physical or virtual event hosted by an organizer. Each event can of
 
 Represents a ticket category (tier) within an event. A single event typically has multiple tiers (e.g., VIP, General Admission, Early Bird), each with its own face value. Individual ticket transactions are recorded in `sale`.
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `ticket_id` | `UUID` | `PRIMARY KEY` | Surrogate key. |
-| `event_id` | `UUID` | `REFERENCES event(event_id)` | The event this ticket category belongs to. |
-| `category` | `VARCHAR(100)` | nullable | Ticket tier or category label (e.g., `VIP`, `General Admission`, `Early Bird`). |
-| `face_value` | `DECIMAL(10,2)` | `NOT NULL` | Official listed price per ticket in the platform's base currency. Does not include reseller markup. |
-| `_created_at` | `TIMESTAMP` | `NOT NULL DEFAULT NOW()` | See audit columns above. |
-| `_updated_at` | `TIMESTAMP` | `NOT NULL DEFAULT NOW()` | See audit columns above. |
+| Column | Type | Constraints | Description                                                                            |
+|--------|------|-------------|----------------------------------------------------------------------------------------|
+| `ticket_id` | `UUID` | `PRIMARY KEY` | Surrogate key.                                                                         |
+| `event_id` | `UUID` | `REFERENCES event(event_id)` | The event this ticket category belongs to.                                             |
+| `category` | `VARCHAR(100)` | nullable | Ticket tier or category label (e.g., `VIP`, `General Admission`, `Early Bird`).        |
+| `face_value` | `DECIMAL(10,2)` | `NOT NULL` | Official listed price per ticket in the USD. Does not include reseller markup. |
+| `_created_at` | `TIMESTAMP` | `NOT NULL DEFAULT NOW()` | See audit columns above.                                                               |
+| `_updated_at` | `TIMESTAMP` | `NOT NULL DEFAULT NOW()` | See audit columns above.                                                               |
 
 **Trigger:** `trg_ticket_updated_at` — fires `BEFORE UPDATE` to refresh `_updated_at`.
 
@@ -151,23 +151,23 @@ Represents a ticket category (tier) within an event. A single event typically ha
 
 Central fact table. Records every individual ticket transaction on the platform, whether sold directly by the organizer or through a reseller. Denormalizes `organizer_id` and `reseller_id` for query efficiency, avoiding multi-join traversal when filtering by either party.
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `sale_id` | `UUID` | `PRIMARY KEY` | Surrogate key. |
-| `ticket_id` | `UUID` | `REFERENCES ticket(ticket_id)` | The ticket category purchased. |
-| `customer_id` | `UUID` | `REFERENCES customer(customer_id)` | The end customer who made the purchase. |
+| Column | Type | Constraints | Description                                                                                                                          |
+|--------|------|-------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| `sale_id` | `UUID` | `PRIMARY KEY` | Surrogate key.                                                                                                                       |
+| `ticket_id` | `UUID` | `REFERENCES ticket(ticket_id)` | The ticket category purchased.                                                                                                       |
+| `customer_id` | `UUID` | `REFERENCES customer(customer_id)` | The end customer who made the purchase.                                                                                              |
 | `organizer_id` | `UUID` | `REFERENCES organizer(organizer_id)` | Denormalized FK — the organizer whose event was sold. Derived from `ticket → event → organizer` but stored directly for performance. |
-| `reseller_id` | `UUID` | `REFERENCES reseller(reseller_id)` | The reseller who facilitated this sale. `NULL` for direct (platform) sales. |
-| `agreement_id` | `UUID` | `REFERENCES commission_agreement(agreement_id)` | The commission agreement governing this sale. `NULL` for direct sales. |
-| `channel` | `VARCHAR(50)` | nullable | Sales channel used by the end customer (e.g., `web`, `mobile-app`, `phone`). |
-| `quantity` | `INT` | `NOT NULL` | Number of tickets purchased in this transaction. Always ≥ 1. |
-| `unit_price` | `DECIMAL(10,2)` | `NOT NULL` | Actual price charged per ticket. May differ from `ticket.face_value` if the reseller applied a markup. |
-| `total_amount` | `DECIMAL(10,2)` | `NOT NULL` | Total transaction value. Equals `quantity × unit_price`. |
-| `commission_amount` | `DECIMAL(10,2)` | `DEFAULT 0.00` | Reseller's commission earned on this sale. Computed as `total_amount × (commission_rate / 100)`. Zero for direct sales. |
-| `source` | `VARCHAR(50)` | nullable | System or origin of the sale record (e.g., `platform`, `reseller_csv`, `api`). Used for data lineage tracking. |
-| `sale_date` | `DATE` | nullable | Calendar date the transaction was completed. |
-| `_created_at` | `TIMESTAMP` | `NOT NULL DEFAULT NOW()` | See audit columns above. |
-| `_updated_at` | `TIMESTAMP` | `NOT NULL DEFAULT NOW()` | See audit columns above. |
+| `reseller_id` | `UUID` | `REFERENCES reseller(reseller_id)` | The reseller who facilitated this sale. `NULL` for direct (platform) sales.                                                          |
+| `agreement_id` | `UUID` | `REFERENCES commission_agreement(agreement_id)` | The commission agreement governing this sale. `NULL` for direct sales.                                                               |
+| `channel` | `VARCHAR(50)` | nullable | Sales channel used by the end customer (e.g., `web`, `mobile-app`, `phone`).                                                         |
+| `quantity` | `INT` | `NOT NULL` | Number of tickets purchased in this transaction. Always ≥ 1.                                                                         |
+| `unit_price` | `DECIMAL(10,2)` | `NOT NULL` | Actual price charged per ticket in USD. May differ from `ticket.face_value` if the reseller applied a markup.                        |
+| `total_amount` | `DECIMAL(10,2)` | `NOT NULL` | Total transaction value. Equals `quantity × unit_price`.                                                                             |
+| `commission_amount` | `DECIMAL(10,2)` | `DEFAULT 0.00` | Reseller's commission earned on this sale. Computed as `total_amount × (commission_rate / 100)`. Zero for direct sales.              |
+| `source` | `VARCHAR(50)` | nullable | System or origin of the sale record (e.g., `platform`, `reseller_csv`, `api`). Used for data lineage tracking.                       |
+| `sale_date` | `DATE` | nullable | Calendar date the transaction was completed.                                                                                         |
+| `_created_at` | `TIMESTAMP` | `NOT NULL DEFAULT NOW()` | See audit columns above.                                                                                                             |
+| `_updated_at` | `TIMESTAMP` | `NOT NULL DEFAULT NOW()` | See audit columns above.                                                                                                             |
 
 **Trigger:** `trg_sale_updated_at` — fires `BEFORE UPDATE` to refresh `_updated_at`.
 
