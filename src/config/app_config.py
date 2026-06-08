@@ -4,27 +4,28 @@ from pathlib import Path
 from typing import Dict
 from dynaconf import Dynaconf
 
+
 class Environment(str, Enum):
-    LOCAL      = "local"
+    LOCAL = "local"
     PRODUCTION = "production"
 
 
 class StorageType(str, Enum):
     LOCAL = "local"
-    S3    = "s3"
+    S3 = "s3"
 
 
 @dataclass(frozen=True)
 class SparkConfig:
-    app_name:           str
-    shuffle_partitions: int                = 100
-    extra_configs:      Dict[str, str]     = field(default_factory=dict)
+    app_name: str
+    shuffle_partitions: int = 100
+    extra_configs: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class StorageConfig:
-    type:         StorageType
-    base_path:    str
+    type: StorageType
+    base_path: str
     inbound_path: str = ""
 
     @property
@@ -37,12 +38,12 @@ class StorageConfig:
 
 @dataclass(frozen=True)
 class DatabaseConfig:
-    host:     str
-    port:     int
-    name:     str
-    user:     str
+    host: str
+    port: int
+    name: str
+    user: str
     password: str
-    driver:   str = "org.postgresql.Driver"
+    driver: str = "org.postgresql.Driver"
 
     @property
     def jdbc_url(self) -> str:
@@ -51,26 +52,27 @@ class DatabaseConfig:
     @property
     def jdbc_properties(self) -> Dict[str, str]:
         return {
-            "user":     self.user,
+            "user": self.user,
             "password": self.password,
-            "driver":   self.driver,
+            "driver": self.driver,
         }
 
 
 @dataclass(frozen=True)
 class AirflowConfig:
     """Airflow connection IDs — names must match connections registered in Airflow."""
-    spark_conn_id:    str = "spark_local"
+
+    spark_conn_id: str = "spark_local"
     postgres_conn_id: str = "postgres_event_platform"
 
 
 @dataclass(frozen=True)
 class AppConfig:
     environment: Environment
-    spark:       SparkConfig
-    storage:     StorageConfig
-    database:    DatabaseConfig
-    airflow:     AirflowConfig = field(default_factory=AirflowConfig)
+    spark: SparkConfig
+    storage: StorageConfig
+    database: DatabaseConfig
+    airflow: AirflowConfig = field(default_factory=AirflowConfig)
 
 
 _PROJECT_ROOT = Path(__file__).parents[2]

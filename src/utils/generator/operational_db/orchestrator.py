@@ -7,8 +7,12 @@ import psycopg2
 from src.config.app_config import DatabaseConfig
 from src.config.config_loader import ConfigLoader
 from src.utils.generator.common.base_generator import BaseGeneratorSettings
-from src.utils.generator.operational_db.core.db_connection_manager import DatabaseConnectionManager
-from src.utils.generator.operational_db.core.db_generator_settings import DBGeneratorSettings
+from src.utils.generator.operational_db.core.db_connection_manager import (
+    DatabaseConnectionManager,
+)
+from src.utils.generator.operational_db.core.db_generator_settings import (
+    DBGeneratorSettings,
+)
 from src.utils.generator.operational_db.data_generators import (
     OrganizerGenerator,
     ResellerGenerator,
@@ -38,7 +42,9 @@ class PlatformOrchestrator:
             with open(schema_path, "r", encoding="utf-8") as f:
                 ddl_script = f.read()
         except OSError as e:
-            self.logger.error("Failed to read schema SQL file from %s: %s", schema_path, e)
+            self.logger.error(
+                "Failed to read schema SQL file from %s: %s", schema_path, e
+            )
             raise
 
         self.logger.info("Initializing database schema using %s...", schema_path)
@@ -75,20 +81,30 @@ class PlatformOrchestrator:
 
                 org_ids = organizer_gen.populate(cursor)
                 res_ids = reseller_gen.populate(cursor)
-                agreements = agreement_gen.populate(cursor, organizer_ids=org_ids, reseller_ids=res_ids)
+                agreements = agreement_gen.populate(
+                    cursor, organizer_ids=org_ids, reseller_ids=res_ids
+                )
                 cust_ids = customer_gen.populate(cursor)
                 events = event_gen.populate(cursor, organizer_ids=org_ids)
                 tickets = ticket_gen.populate(cursor, events=events)
 
                 sale_gen.populate(
-                    cursor, tickets=tickets, events=events, customer_ids=cust_ids,
-                    organizer_ids=org_ids, reseller_ids=res_ids, agreements=agreements,
-                    count=self._settings.num_sales, source="platform"
+                    cursor,
+                    tickets=tickets,
+                    events=events,
+                    customer_ids=cust_ids,
+                    organizer_ids=org_ids,
+                    reseller_ids=res_ids,
+                    agreements=agreements,
+                    count=self._settings.num_sales,
+                    source="platform",
                 )
 
 
 if __name__ == "__main__":
     _app_config = ConfigLoader.load()
     _settings = DBGeneratorSettings()
-    _orchestrator = PlatformOrchestrator(db_config=_app_config.database, settings=_settings)
+    _orchestrator = PlatformOrchestrator(
+        db_config=_app_config.database, settings=_settings
+    )
     _orchestrator.run()

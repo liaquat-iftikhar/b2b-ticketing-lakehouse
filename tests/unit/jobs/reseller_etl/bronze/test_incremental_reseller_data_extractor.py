@@ -6,7 +6,9 @@ from unittest.mock import MagicMock, patch
 
 from pyspark.sql import SparkSession
 
-from src.jobs.reseller_sale_etl.bronze.incremental_reseller_data_extractor import IncrementalResellerDataExtractor
+from src.jobs.reseller_sale_etl.bronze.incremental_reseller_data_extractor import (
+    IncrementalResellerDataExtractor,
+)
 
 
 class TestIncrementalResellerDataExtractor(unittest.TestCase):
@@ -15,8 +17,7 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
     def setUpClass(cls) -> None:
         """Initialize a local, isolated SparkSession for unit test execution."""
         cls.spark = (
-            SparkSession.builder
-            .master("local[*]")
+            SparkSession.builder.master("local[*]")
             .appName("UnitTest-IncrementalResellerDataExtractor")
             .config("spark.sql.shuffle.partitions", "1")
             .config("spark.ui.enabled", "false")
@@ -49,32 +50,45 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         extractor_custom = IncrementalResellerDataExtractor(
             source_path=self.source_path,
             execution_date="2026-06-05",
-            lakehouse_base_path=self.lakehouse_base_path
+            lakehouse_base_path=self.lakehouse_base_path,
         )
 
         self.assertEqual(extractor_custom.source_path, self.source_path)
-        self.assertTrue(extractor_custom.lakehouse_paths.target_dir.endswith("lakehouse/reseller_sale_etl/bronze"))
         self.assertTrue(
-            extractor_custom.lakehouse_paths.checkpoint_dir.endswith("lakehouse/reseller_sale_etl/_checkpoints/reseller_sale_etl_to_bronze"))
+            extractor_custom.lakehouse_paths.target_dir.endswith(
+                "lakehouse/reseller_sale_etl/bronze"
+            )
+        )
+        self.assertTrue(
+            extractor_custom.lakehouse_paths.checkpoint_dir.endswith(
+                "lakehouse/reseller_sale_etl/_checkpoints/reseller_sale_etl_to_bronze"
+            )
+        )
 
         # Scenario B: Verifying path resolution when falling back to the internal default workspace path
         extractor_default = IncrementalResellerDataExtractor(
             source_path=self.source_path,
             execution_date="2026-06-05",
-            lakehouse_base_path=None  # Triggers default project root path resolution logic
+            lakehouse_base_path=None,  # Triggers default project root path resolution logic
         )
 
-        self.assertTrue(extractor_default.lakehouse_paths.target_dir.endswith("reseller_sale_etl/bronze"))
+        self.assertTrue(
+            extractor_default.lakehouse_paths.target_dir.endswith(
+                "reseller_sale_etl/bronze"
+            )
+        )
 
     @patch("src.jobs.core.base_data_pipeline.SparkSessionFactory")
-    def test_extract_raises_file_not_found_for_missing_source(self, mock_spark_factory) -> None:
+    def test_extract_raises_file_not_found_for_missing_source(
+        self, mock_spark_factory
+    ) -> None:
         """Verify that _extract raises FileNotFoundError if the local source path does not exist."""
         # Arrange
         non_existent_path = os.path.join(self.test_dir, "ghost_directory")
         extractor = IncrementalResellerDataExtractor(
             source_path=non_existent_path,
             execution_date="2026-06-05",
-            lakehouse_base_path=self.lakehouse_base_path
+            lakehouse_base_path=self.lakehouse_base_path,
         )
         extractor.spark = self.spark
 
@@ -89,12 +103,26 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         extractor = IncrementalResellerDataExtractor(
             source_path=self.source_path,
             execution_date="2026-06-05",
-            lakehouse_base_path=self.lakehouse_base_path
+            lakehouse_base_path=self.lakehouse_base_path,
         )
 
         # Build mock source batch data matching schema
-        test_data = [("TX123", "Concert", "2", "100.00", "Web", "John", "Doe", "Berlin", "2026-06-05")]
-        input_df = self.spark.createDataFrame(test_data, schema=extractor.DATA_CONTRACT_SCHEMA)
+        test_data = [
+            (
+                "TX123",
+                "Concert",
+                "2",
+                "100.00",
+                "Web",
+                "John",
+                "Doe",
+                "Berlin",
+                "2026-06-05",
+            )
+        ]
+        input_df = self.spark.createDataFrame(
+            test_data, schema=extractor.DATA_CONTRACT_SCHEMA
+        )
 
         # Act
         clean_df, quarantine_df = extractor._transform(input_df)
@@ -103,16 +131,20 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         self.assertIn("input_file_name", clean_df.columns)
         self.assertIsNone(quarantine_df)
 
-        self.assertEqual(len(clean_df.columns), len(extractor.DATA_CONTRACT_SCHEMA.names) + 5)
+        self.assertEqual(
+            len(clean_df.columns), len(extractor.DATA_CONTRACT_SCHEMA.names) + 5
+        )
 
     @patch("src.jobs.core.base_data_pipeline.SparkSessionFactory")
-    def test_load_starts_and_terminates_streaming_query(self, mock_spark_factory) -> None:
+    def test_load_starts_and_terminates_streaming_query(
+        self, mock_spark_factory
+    ) -> None:
         """Verify that _load configures, runs, and terminates a writeStream query."""
         # Arrange
         extractor = IncrementalResellerDataExtractor(
             source_path=self.source_path,
             execution_date="2026-06-05",
-            lakehouse_base_path=self.lakehouse_base_path
+            lakehouse_base_path=self.lakehouse_base_path,
         )
 
         # Mock structural streaming outputs
@@ -135,7 +167,9 @@ class TestIncrementalResellerDataExtractor(unittest.TestCase):
         # Assert
         mock_writer.format.assert_called_once_with("delta")
         mock_writer.outputMode.assert_called_once_with("append")
-        mock_writer.option.assert_called_with("checkpointLocation", extractor.lakehouse_paths.checkpoint_dir)
+        mock_writer.option.assert_called_with(
+            "checkpointLocation", extractor.lakehouse_paths.checkpoint_dir
+        )
         mock_writer.start.assert_called_once_with(extractor.lakehouse_paths.target_dir)
         mock_query.awaitTermination.assert_called_once()
 

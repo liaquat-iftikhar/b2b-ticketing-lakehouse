@@ -39,7 +39,7 @@ class GoldTableLoader:
         self._logger.info(
             "Extracted %d rows from Gold storage for partition date %s",
             len(dataframe),
-            execution_date
+            execution_date,
         )
         return dataframe
 
@@ -50,15 +50,32 @@ class SalesReportExpectationSuiteBuilder:
     SUITE_NAME = "sales_report_gold_suite"
 
     REQUIRED_COLUMNS = [
-        "sale_id", "event_name", "event_type", "event_region", "tickets_count",
-        "total_amount", "commission_amount", "commission_rate_applied", "sales_channel",
-        "customer_first_name", "customer_last_name", "reseller_id", "sale_date",
-        "reseller_location", "source",
+        "sale_id",
+        "event_name",
+        "event_type",
+        "event_region",
+        "tickets_count",
+        "total_amount",
+        "commission_amount",
+        "commission_rate_applied",
+        "sales_channel",
+        "customer_first_name",
+        "customer_last_name",
+        "reseller_id",
+        "sale_date",
+        "reseller_location",
+        "source",
     ]
 
     COMPLETENESS_COLUMNS = [
-        "sale_id", "sale_date", "total_amount", "tickets_count",
-        "sales_channel", "source", "customer_first_name", "customer_last_name"
+        "sale_id",
+        "sale_date",
+        "total_amount",
+        "tickets_count",
+        "sales_channel",
+        "source",
+        "customer_first_name",
+        "customer_last_name",
     ]
 
     VALID_SOURCES = ["platform", "csv_import"]
@@ -85,15 +102,26 @@ class SalesReportExpectationSuiteBuilder:
         )
 
         # 4. Value Range Bounds Checking (Numeric Sanity)
-        suite.add_expectation(gxe.ExpectColumnValuesToBeBetween(column="total_amount", min_value=0))
-        suite.add_expectation(gxe.ExpectColumnValuesToBeBetween(column="tickets_count", min_value=1))
-        suite.add_expectation(gxe.ExpectColumnValuesToBeBetween(column="commission_amount", min_value=0))
         suite.add_expectation(
-            gxe.ExpectColumnValuesToBeBetween(column="commission_rate_applied", min_value=0, max_value=100))
+            gxe.ExpectColumnValuesToBeBetween(column="total_amount", min_value=0)
+        )
+        suite.add_expectation(
+            gxe.ExpectColumnValuesToBeBetween(column="tickets_count", min_value=1)
+        )
+        suite.add_expectation(
+            gxe.ExpectColumnValuesToBeBetween(column="commission_amount", min_value=0)
+        )
+        suite.add_expectation(
+            gxe.ExpectColumnValuesToBeBetween(
+                column="commission_rate_applied", min_value=0, max_value=100
+            )
+        )
 
         # 5. Categorical Domain Enforcement
         suite.add_expectation(
-            gxe.ExpectColumnValuesToBeInSet(column="source", value_set=self.VALID_SOURCES)
+            gxe.ExpectColumnValuesToBeInSet(
+                column="source", value_set=self.VALID_SOURCES
+            )
         )
 
         # 6. Freshness / Activity Verification
@@ -109,9 +137,13 @@ class DataQualityValidator:
         self.suite_builder = suite_builder
         self._logger = logging.getLogger(self.__class__.__name__)
 
-    def execute_quality_gate(self, dataframe: pd.DataFrame, execution_date: str) -> bool:
+    def execute_quality_gate(
+        self, dataframe: pd.DataFrame, execution_date: str
+    ) -> bool:
         """Executes full quality evaluations against a provided DataFrame asset."""
-        self._logger.info("Initializing ephemeral Great Expectations execution driver...")
+        self._logger.info(
+            "Initializing ephemeral Great Expectations execution driver..."
+        )
         context = gx.get_context(mode="ephemeral")
 
         # Build expectation components via injected blueprint builder
@@ -154,8 +186,11 @@ class DataQualityValidator:
             self._logger.error("DATA QUALITY EXCEPTION DETECTED — BREACH DETAILS:")
             for evaluation in result.results:
                 if not evaluation.success:
-                    column = evaluation.expectation_config.column if hasattr(evaluation.expectation_config,
-                                                                             "column") else "Global Table Context"
+                    column = (
+                        evaluation.expectation_config.column
+                        if hasattr(evaluation.expectation_config, "column")
+                        else "Global Table Context"
+                    )
                     self._logger.error(
                         "  ✗ Rule Type: %s | Evaluation Focus: %s | Error Trace Metrics: %s",
                         evaluation.expectation_config.type,
@@ -195,24 +230,30 @@ class GoldQualityGateApp:
             validator = DataQualityValidator(suite_builder=suite_builder)
 
             # Process execution pipelines
-            dataframe = loader.load_partition_by_date(execution_date=self.execution_date)
-            gate_passed = validator.execute_quality_gate(
-                dataframe=dataframe,
+            dataframe = loader.load_partition_by_date(
                 execution_date=self.execution_date
+            )
+            gate_passed = validator.execute_quality_gate(
+                dataframe=dataframe, execution_date=self.execution_date
             )
 
             if not gate_passed:
                 self._logger.error(
                     "Data quality gate FAILED for execution date %s. Blocked further ingestion cascades.",
-                    self.execution_date
+                    self.execution_date,
                 )
                 sys.exit(1)
 
-            self._logger.info("Data quality gate PASSED for execution date %s.", self.execution_date)
+            self._logger.info(
+                "Data quality gate PASSED for execution date %s.", self.execution_date
+            )
             sys.exit(0)
 
         except Exception as error:
-            self._logger.exception("Fatal processing loop disruption caught at application context: %s", error)
+            self._logger.exception(
+                "Fatal processing loop disruption caught at application context: %s",
+                error,
+            )
             sys.exit(2)
 
 
@@ -236,7 +277,6 @@ if __name__ == "__main__":
 
     # Launch application runtime instance
     app = GoldQualityGateApp(
-        execution_date=args.execution_date,
-        lakehouse_base_path=args.lakehouse_base_path
+        execution_date=args.execution_date, lakehouse_base_path=args.lakehouse_base_path
     )
     app.run()

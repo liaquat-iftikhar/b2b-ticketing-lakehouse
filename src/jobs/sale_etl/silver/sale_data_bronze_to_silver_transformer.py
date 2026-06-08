@@ -6,11 +6,12 @@ from delta.tables import DeltaTable
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-from pyspark.sql.types import DecimalType, IntegerType, TimestampType
+from pyspark.sql.types import TimestampType
 
 from src.jobs.common.constants import Constants
 from src.jobs.core.base_data_pipeline import BaseDataPipeline
 from src.jobs.common.lakehouse_path_resolver import LakehousePathResolver
+
 
 class SaleDataBronzeToSilverTransformer(BaseDataPipeline):
     """
@@ -18,8 +19,12 @@ class SaleDataBronzeToSilverTransformer(BaseDataPipeline):
     idempotent upserts (MERGE) into the Silver tier.
     """
 
-    def __init__(self, execution_date: str, lakehouse_base_path: Optional[str] = None,
-                 etl_name: str = "sale_etl") -> None:
+    def __init__(
+        self,
+        execution_date: str,
+        lakehouse_base_path: Optional[str] = None,
+        etl_name: str = "sale_etl",
+    ) -> None:
         self.execution_date = execution_date
         self.logger = logging.getLogger(__name__)
 
@@ -27,81 +32,120 @@ class SaleDataBronzeToSilverTransformer(BaseDataPipeline):
             execution_date=execution_date,
             layer=Constants.LAYERS.SILVER,
             etl_name=etl_name,
-            lakehouse_base_path=lakehouse_base_path
+            lakehouse_base_path=lakehouse_base_path,
         )
 
         resolver = LakehousePathResolver(lakehouse_base_path=lakehouse_base_path)
-        self.bronze_source_dir = resolver.resolve(layer="bronze", etl_name=etl_name).target_dir
+        self.bronze_source_dir = resolver.resolve(
+            layer="bronze", etl_name=etl_name
+        ).target_dir
 
     def _extract(self) -> DataFrame:
-        self.logger.info("Extracting batch partition data from Bronze directory: %s", self.bronze_source_dir)
+        self.logger.info(
+            "Extracting batch partition data from Bronze directory: %s",
+            self.bronze_source_dir,
+        )
 
         return (
-            self.spark.read
-            .format("delta")
+            self.spark.read.format("delta")
             .load(self.bronze_source_dir)
-            .filter(F.col("lh_bronze_execution_date") == F.to_date(F.lit(self.execution_date)))
+            .filter(
+                F.col("lh_bronze_execution_date")
+                == F.to_date(F.lit(self.execution_date))
+            )
         )
 
     def _transform(self, df: DataFrame) -> Tuple[DataFrame, Optional[DataFrame]]:
-        self.logger.info("Executing transactional normalization and schema casting optimization matrix...")
+        self.logger.info(
+            "Executing transactional normalization and schema casting optimization matrix..."
+        )
 
         # Enforce strict data types and drop unrefined legacy raw source strings
         conformed_df = (
-            df
-            .withColumn("record_inserted_timestamp", F.col("_created_at").cast(TimestampType()))
-            .withColumn("record_last_updated_timestamp", F.col("_updated_at").cast(TimestampType()))
+            df.withColumn(
+                "record_inserted_timestamp", F.col("_created_at").cast(TimestampType())
+            )
+            .withColumn(
+                "record_last_updated_timestamp",
+                F.col("_updated_at").cast(TimestampType()),
+            )
             .drop("_created_at", "_updated_at")
         )
 
-        window_spec = Window.partitionBy("reseller_id", "sale_id").orderBy(F.col("lh_bronze_inserted_timestamp").desc())
+        window_spec = Window.partitionBy("reseller_id", "sale_id").orderBy(
+            F.col("lh_bronze_inserted_timestamp").desc()
+        )
 
         deduplicated_df = (
-            conformed_df
-            .withColumn("row_num", F.row_number().over(window_spec))
+            conformed_df.withColumn("row_num", F.row_number().over(window_spec))
             .filter(F.col("row_num") == 1)
             .drop("row_num")
         )
 
         # Inject unified Silver transformation audit columns
         final_silver_df = (
-            deduplicated_df
-            .withColumn("lh_silver_execution_date", F.to_date(F.lit(self.execution_date)))
+            deduplicated_df.withColumn(
+                "lh_silver_execution_date", F.to_date(F.lit(self.execution_date))
+            )
             .withColumn("lh_silver_inserted_timestamp", F.current_timestamp())
             .select(
-                "sale_id", "ticket_id", "customer_id", "organizer_id", "reseller_id", "agreement_id", "channel",
-                "quantity", "unit_price", "total_amount", "commission_amount", "source", "sale_date",
-                "record_inserted_timestamp", "record_last_updated_timestamp", "lh_bronze_execution_date",
-                "lh_bronze_inserted_timestamp", "lh_bronze_source_database_table", "lh_silver_execution_date",
-                "lh_silver_inserted_timestamp"
+                "sale_id",
+                "ticket_id",
+                "customer_id",
+                "organizer_id",
+                "reseller_id",
+                "agreement_id",
+                "channel",
+                "quantity",
+                "unit_price",
+                "total_amount",
+                "commission_amount",
+                "source",
+                "sale_date",
+                "record_inserted_timestamp",
+                "record_last_updated_timestamp",
+                "lh_bronze_execution_date",
+                "lh_bronze_inserted_timestamp",
+                "lh_bronze_source_database_table",
+                "lh_silver_execution_date",
+                "lh_silver_inserted_timestamp",
             )
         )
 
         return final_silver_df, None
 
-    def _load(self, df_clean: DataFrame, df_quarantine: Optional[DataFrame] = None) -> None:
+    def _load(
+        self, df_clean: DataFrame, df_quarantine: Optional[DataFrame] = None
+    ) -> None:
 
         delta_log_path = os.path.join(self.lakehouse_paths.target_dir, "_delta_log")
-        table_exists = DeltaTable.isDeltaTable(self.spark, self.lakehouse_paths.target_dir) and os.path.exists(
-            delta_log_path)
+        table_exists = DeltaTable.isDeltaTable(
+            self.spark, self.lakehouse_paths.target_dir
+        ) and os.path.exists(delta_log_path)
 
         # 1. Cold-Start Check: If the transaction ledger isn't physically there, bootstrap the table
         if not table_exists:
             self.logger.info(
-                "Target transaction log is missing or uninitialized. Bootstrapping raw Delta table structure...")
+                "Target transaction log is missing or uninitialized. Bootstrapping raw Delta table structure..."
+            )
             (
-                df_clean.write
-                .format("delta")
+                df_clean.write.format("delta")
                 .mode("overwrite")
                 .save(self.lakehouse_paths.target_dir)
             )
 
         # 2. Production Upsert Strategy: Apply transactional MERGE statement execution logs
         else:
-            self.logger.info("Target Delta table log structure confirmed. Instantiating matching merge layout...")
-            target_table = DeltaTable.forPath(self.spark, self.lakehouse_paths.target_dir)
+            self.logger.info(
+                "Target Delta table log structure confirmed. Instantiating matching merge layout..."
+            )
+            target_table = DeltaTable.forPath(
+                self.spark, self.lakehouse_paths.target_dir
+            )
             merge_condition = "target.sale_id = updates.sale_id"
-            merge_condition += " AND target.reseller_id IS NOT DISTINCT FROM updates.reseller_id"
+            merge_condition += (
+                " AND target.reseller_id IS NOT DISTINCT FROM updates.reseller_id"
+            )
             (
                 target_table.alias("target")
                 .merge(
@@ -113,26 +157,29 @@ class SaleDataBronzeToSilverTransformer(BaseDataPipeline):
                 .execute()
             )
 
-        self.logger.info("Successfully completed loading conformed metrics into Silver Delta layer.")
+        self.logger.info(
+            "Successfully completed loading conformed metrics into Silver Delta layer."
+        )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Lakehouse Sale Silver Layer Conformance Transformer Engine")
+    parser = argparse.ArgumentParser(
+        description="Lakehouse Sale Silver Layer Conformance Transformer Engine"
+    )
     parser.add_argument(
         "--execution_date",
         required=True,
-        help="Processing logic state context day partition (Format: YYYY-MM-DD)."
+        help="Processing logic state context day partition (Format: YYYY-MM-DD).",
     )
     parser.add_argument(
         "--lakehouse_base_path",
         default=None,
-        help="Target base directory system path mapping parameter."
+        help="Target base directory system path mapping parameter.",
     )
     args = parser.parse_args()
 
     transformer = SaleDataBronzeToSilverTransformer(
-        execution_date=args.execution_date,
-        lakehouse_base_path=args.lakehouse_base_path
+        execution_date=args.execution_date, lakehouse_base_path=args.lakehouse_base_path
     )
 
     transformer.execute()

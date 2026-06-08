@@ -16,7 +16,9 @@ class BaseGenerator(ABC):
         self.fake = fake
         self.settings = settings
 
-    protected_date_delta = property(lambda self: (self.settings.date_end - self.settings.date_start).days)
+    protected_date_delta = property(
+        lambda self: (self.settings.date_end - self.settings.date_start).days
+    )
 
     def _generate_random_date(self) -> date:
         random_days = random.randint(0, self.protected_date_delta)

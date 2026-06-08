@@ -14,7 +14,9 @@ class SalesDashboardView:
 
     def render_app_layout(self):
         """Main rendering pipeline sequence executing page structures sequentially."""
-        st.set_page_config(page_title="Corporate Sales Data Warehouse", page_icon="", layout="wide")
+        st.set_page_config(
+            page_title="Corporate Sales Data Warehouse", page_icon="", layout="wide"
+        )
         st.title("Corporate Sales Data Warehouse Analytics")
         st.markdown("### Open-Source Serverless Data Lakehouse Reporting Engine")
         st.write("---")
@@ -27,12 +29,14 @@ class SalesDashboardView:
 
     def _render_workspace_tabs(self, filter_sql: str):
         """Constructs partitioned analysis areas targeting discrete client demands."""
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "Weekly Channel Trends",
-            "YoY February Comparison",
-            "Commission Correlation",
-            "Regional Popularity"
-        ])
+        tab1, tab2, tab3, tab4 = st.tabs(
+            [
+                "Weekly Channel Trends",
+                "YoY February Comparison",
+                "Commission Correlation",
+                "Regional Popularity",
+            ]
+        )
 
         with tab1:
             st.subheader("Weekly Sales Volume Segmented by Channel")
@@ -46,13 +50,19 @@ class SalesDashboardView:
                 GROUP BY 1, 2 ORDER BY week_number ASC
             """)
             if not df_weekly.empty:
-                fig = px.line(df_weekly, x="week_number", y="gross_sales", color="channel", markers=True)
+                fig = px.line(
+                    df_weekly,
+                    x="week_number",
+                    y="gross_sales",
+                    color="channel",
+                    markers=True,
+                )
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No timeline records found matching filter constraints.")
 
         with tab2:
-            st.subheader("⚖️ YoY February Evaluation Matrix")
+            st.subheader("YoY February Evaluation Matrix")
             df_feb = self.model.run_query(f"""
                 SELECT 
                     EXTRACT(YEAR FROM CAST(sale_date AS DATE)) as sale_year,
@@ -64,18 +74,32 @@ class SalesDashboardView:
                 GROUP BY 1
                 ORDER BY sale_year ASC
             """)
-            if not df_feb.empty and 2020 in df_feb['sale_year'].values:
-                rev_19 = df_feb[df_feb['sale_year'] == 2019]['gross_revenue'].values[0] if 2019 in df_feb[
-                    'sale_year'].values else 0
-                rev_20 = df_feb[df_feb['sale_year'] == 2020]['gross_revenue'].values[0] if 2020 in df_feb[
-                    'sale_year'].values else 0
+            if not df_feb.empty and 2020 in df_feb["sale_year"].values:
+                rev_19 = (
+                    df_feb[df_feb["sale_year"] == 2019]["gross_revenue"].values[0]
+                    if 2019 in df_feb["sale_year"].values
+                    else 0
+                )
+                rev_20 = (
+                    df_feb[df_feb["sale_year"] == 2020]["gross_revenue"].values[0]
+                    if 2020 in df_feb["sale_year"].values
+                    else 0
+                )
                 delta = ((rev_20 - rev_19) / rev_19 * 100) if rev_19 > 0 else 0
 
-                st.metric("February 2020 Revenue Total", f"${rev_20:,.2f}", delta=f"{delta:+.2f}% vs 2019 baseline")
-                fig = px.bar(df_feb, x="sale_year", y="gross_revenue", color="sale_year")
+                st.metric(
+                    "February 2020 Revenue Total",
+                    f"${rev_20:,.2f}",
+                    delta=f"{delta:+.2f}% vs 2019 baseline",
+                )
+                fig = px.bar(
+                    df_feb, x="sale_year", y="gross_revenue", color="sale_year"
+                )
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.info("Baseline data points for comparison windows are unavailable within current filters.")
+                st.info(
+                    "Baseline data points for comparison windows are unavailable within current filters."
+                )
 
         with tab3:
             st.subheader("Commission Rate Performance Correlation Analysis")
@@ -90,9 +114,11 @@ class SalesDashboardView:
                     "x": "commission_rate",
                     "y": "transaction_value",
                     "size": "quantity_sold",
-                    "labels": {"commission_rate": "Incentive Commission Bracket (%)",
-                               "transaction_value": "Logged Gross Value ($)"},
-                    "title": "Regression Distribution: Commission Structure Influence Matrix"
+                    "labels": {
+                        "commission_rate": "Incentive Commission Bracket (%)",
+                        "transaction_value": "Logged Gross Value ($)",
+                    },
+                    "title": "Regression Distribution: Commission Structure Influence Matrix",
                 }
 
                 scatter_kwargs["trendline"] = "ols"
@@ -101,7 +127,9 @@ class SalesDashboardView:
                 fig = px.scatter(**scatter_kwargs)
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.info("Incentive transaction metrics are empty for the current parameters.")
+                st.info(
+                    "Incentive transaction metrics are empty for the current parameters."
+                )
 
         with tab4:
             st.subheader("Geographic Demand: Most Popular Tickets per Region")
@@ -115,9 +143,15 @@ class SalesDashboardView:
                 QUALIFY ROW_NUMBER() OVER (PARTITION BY region ORDER BY total_tickets_sold DESC) <= 3
             """)
             if not df_popular.empty:
-                df_popular['event'] = df_popular['event'].str.title()
-                fig = px.bar(df_popular, x="total_tickets_sold", y="region", color="event", orientation="h",
-                             barmode="group")
+                df_popular["event"] = df_popular["event"].str.title()
+                fig = px.bar(
+                    df_popular,
+                    x="total_tickets_sold",
+                    y="region",
+                    color="event",
+                    orientation="h",
+                    barmode="group",
+                )
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No spatial data points identified.")
@@ -133,23 +167,29 @@ class SalesDashboardView:
         """)
 
         if not df_ledger.empty:
-            df_ledger['event_name'] = df_ledger['event_name'].str.title()
-            df_ledger['sales_channel'] = df_ledger['sales_channel'].str.upper()
-            df_ledger['source'] = df_ledger['source'].str.replace('_', ' ').str.title()
+            df_ledger["event_name"] = df_ledger["event_name"].str.title()
+            df_ledger["sales_channel"] = df_ledger["sales_channel"].str.upper()
+            df_ledger["source"] = df_ledger["source"].str.replace("_", " ").str.title()
 
             st.dataframe(
-                df_ledger, use_container_width=True, hide_index=True,
+                df_ledger,
+                use_container_width=True,
+                hide_index=True,
                 column_config={
-                    "total_amount": st.column_config.NumberColumn("Total Amount", format="$%.2f"),
-                    "commission_amount": st.column_config.NumberColumn("Commission Amount", format="$%.2f"),
-                }
+                    "total_amount": st.column_config.NumberColumn(
+                        "Total Amount", format="$%.2f"
+                    ),
+                    "commission_amount": st.column_config.NumberColumn(
+                        "Commission Amount", format="$%.2f"
+                    ),
+                },
             )
 
             st.download_button(
                 label="Download Conformed Data Warehouse Audit Spreadsheet (.CSV)",
-                data=df_ledger.to_csv(index=False).encode('utf-8'),
+                data=df_ledger.to_csv(index=False).encode("utf-8"),
                 file_name="conformed_data_warehouse_sales_export.csv",
-                mime="text/csv"
+                mime="text/csv",
             )
         else:
             st.warning("No ledger entries compiled for current selection parameters.")

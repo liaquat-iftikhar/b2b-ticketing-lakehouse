@@ -28,7 +28,9 @@ class DatabaseConnectionManager:
         if self._connection:
             if exc_type is not None:
                 self._connection.rollback()
-                print(f"Error encountered — transaction rolled back.\nDetails: {exc_val}")
+                print(
+                    f"Error encountered — transaction rolled back.\nDetails: {exc_val}"
+                )
             else:
                 self._connection.commit()
                 print("All data committed successfully to the database.")

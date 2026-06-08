@@ -16,12 +16,12 @@ class BaseDataPipeline(ABC):
     """
 
     def __init__(
-            self,
-            execution_date: str,
-            layer: str,
-            etl_name: str,
-            lakehouse_base_path: Optional[str] = None,
-            extra_configs: Optional[Dict[str, str]] = None,
+        self,
+        execution_date: str,
+        layer: str,
+        etl_name: str,
+        lakehouse_base_path: Optional[str] = None,
+        extra_configs: Optional[Dict[str, str]] = None,
     ) -> None:
         self.execution_date = execution_date
         self.layer = layer
@@ -67,7 +67,10 @@ class BaseDataPipeline(ABC):
         spark_cfg: SparkConfig = dataclasses.replace(
             self._app_config.spark,
             app_name=app_name,
-            extra_configs={**self._app_config.spark.extra_configs, **self.extra_configs},
+            extra_configs={
+                **self._app_config.spark.extra_configs,
+                **self.extra_configs,
+            },
         )
 
         factory = SparkSessionFactory(
@@ -82,10 +85,14 @@ class BaseDataPipeline(ABC):
             clean_data, quarantined_data = self._transform(raw_data)
             self._load(clean_data, quarantined_data)
 
-            self.logger.info("Pipeline completed for execution partition: %s", self.execution_date)
+            self.logger.info(
+                "Pipeline completed for execution partition: %s", self.execution_date
+            )
 
         except Exception as exc:
-            self.logger.critical("Fatal failure in pipeline '%s': %s", app_name, exc, exc_info=True)
+            self.logger.critical(
+                "Fatal failure in pipeline '%s': %s", app_name, exc, exc_info=True
+            )
             raise RuntimeError(f"Pipeline execution failed for: {app_name}") from exc
 
         finally:

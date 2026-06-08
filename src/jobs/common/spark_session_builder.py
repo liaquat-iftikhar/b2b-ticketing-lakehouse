@@ -17,16 +17,18 @@ class SparkSessionFactory:
         "com.amazonaws:aws-java-sdk-bundle:1.12.262",
     ]
 
-
-    def __init__(self, spark_config: SparkConfig, storage_config: StorageConfig) -> None:
+    def __init__(
+        self, spark_config: SparkConfig, storage_config: StorageConfig
+    ) -> None:
         self._spark_config = spark_config
         self._storage_config = storage_config
         self._logger = logging.getLogger(__name__)
 
-
     def get_or_create(self) -> SparkSession:
         """Build and return an active SparkSession."""
-        self._logger.info("Initialising SparkSession for app '%s'", self._spark_config.app_name)
+        self._logger.info(
+            "Initialising SparkSession for app '%s'", self._spark_config.app_name
+        )
         builder = SparkSession.builder.appName(self._spark_config.app_name)
         jar_packages = [self._POSTGRES_JAR]
 
@@ -47,17 +49,24 @@ class SparkSessionFactory:
             self._logger.info("SparkSession ready (Spark %s)", session.version)
             return session
         except Exception as exc:
-            self._logger.critical("SparkSession initialisation failed: %s", exc, exc_info=True)
+            self._logger.critical(
+                "SparkSession initialisation failed: %s", exc, exc_info=True
+            )
             raise RuntimeError("Failed to build SparkSession.") from exc
 
     def _apply_s3_configs(self, builder: SparkSession.Builder) -> SparkSession.Builder:
         """Inject Hadoop-AWS credentials and filesystem settings."""
         self._logger.info("Applying S3/Hadoop-AWS configurations...")
         return (
-            builder
-            .config("spark.hadoop.fs.s3a.access.key", os.getenv("AWS_ACCESS_KEY_ID", ""))
-            .config("spark.hadoop.fs.s3a.secret.key", os.getenv("AWS_SECRET_ACCESS_KEY", ""))
-            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+            builder.config(
+                "spark.hadoop.fs.s3a.access.key", os.getenv("AWS_ACCESS_KEY_ID", "")
+            )
+            .config(
+                "spark.hadoop.fs.s3a.secret.key", os.getenv("AWS_SECRET_ACCESS_KEY", "")
+            )
+            .config(
+                "spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem"
+            )
             .config(
                 "spark.hadoop.fs.s3a.aws.credentials.provider",
                 "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",

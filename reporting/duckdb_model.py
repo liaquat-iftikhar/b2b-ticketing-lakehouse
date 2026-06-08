@@ -16,14 +16,16 @@ class DuckDBModel:
         """Verifies physical presence of the target data warehouse folder."""
         if not os.path.exists(self.warehouse_path):
             st.error(f"Target Data Warehouse path not found: `{self.warehouse_path}`")
-            st.info("Please verify that your upstream PySpark Gold pipelines have run successfully.")
+            st.info(
+                "Please verify that your upstream PySpark Gold pipelines have run successfully."
+            )
             st.stop()
 
     @staticmethod
     @st.cache_resource
     def _get_cached_engine():
         """Bootstraps a single shared in-memory connection context with Delta extensions."""
-        con = duckdb.connect(database=':memory:')
+        con = duckdb.connect(database=":memory:")
         con.execute("INSTALL delta; LOAD delta;")
         return con
 

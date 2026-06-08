@@ -23,22 +23,32 @@ class DashboardFilters:
             "Filter by Event Types", options=event_opts, default=event_opts
         )
         self.selected_resellers = st.sidebar.multiselect(
-            "Filter by Resellers / Channels", options=reseller_opts, default=reseller_opts
+            "Filter by Resellers / Channels",
+            options=reseller_opts,
+            default=reseller_opts,
         )
 
     @staticmethod
     @st.cache_data(ttl=60)
     def _fetch_dimensions(path: str):
         """Static cached query extractor protecting instance serialization tracking loops."""
-        con = duckdb.connect(database=':memory:')
+        con = duckdb.connect(database=":memory:")
         con.execute("INSTALL delta; LOAD delta;")
 
-        event_types = \
-        con.execute(f"SELECT DISTINCT event_type FROM delta_scan('{path}') WHERE event_type IS NOT NULL").fetchdf()[
-            'event_type'].tolist()
-        resellers = con.execute(
-            f"SELECT DISTINCT COALESCE(reseller_id, 'Direct Platform Sale') as reseller FROM delta_scan('{path}')").fetchdf()[
-            'reseller'].tolist()
+        event_types = (
+            con.execute(
+                f"SELECT DISTINCT event_type FROM delta_scan('{path}') WHERE event_type IS NOT NULL"
+            )
+            .fetchdf()["event_type"]
+            .tolist()
+        )
+        resellers = (
+            con.execute(
+                f"SELECT DISTINCT COALESCE(reseller_id, 'Direct Platform Sale') as reseller FROM delta_scan('{path}')"
+            )
+            .fetchdf()["reseller"]
+            .tolist()
+        )
         return event_types, resellers
 
     def get_where_clause(self) -> str:
@@ -54,7 +64,9 @@ class DashboardFilters:
         else:
             where_clause += f" AND event_type IN {tuple(self.selected_event_types)}"
 
-        reseller_filter = [r for r in self.selected_resellers if r != 'Direct Platform Sale']
+        reseller_filter = [
+            r for r in self.selected_resellers if r != "Direct Platform Sale"
+        ]
         conditions = []
 
         if reseller_filter:
@@ -63,7 +75,7 @@ class DashboardFilters:
             else:
                 conditions.append(f"reseller_id IN {tuple(reseller_filter)}")
 
-        if 'Direct Platform Sale' in self.selected_resellers:
+        if "Direct Platform Sale" in self.selected_resellers:
             conditions.append("reseller_id IS NULL")
 
         if conditions:

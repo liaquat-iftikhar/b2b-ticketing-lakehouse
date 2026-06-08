@@ -51,7 +51,9 @@ class LakehousePathResolver:
             RuntimeError: If underlying system operations encounter structural path failures.
         """
         if not layer or not etl_name:
-            raise ValueError("Parameters 'layer' and 'etl_name' must be populated strings.")
+            raise ValueError(
+                "Parameters 'layer' and 'etl_name' must be populated strings."
+            )
 
         try:
             sanitized_layer = layer.strip().lower()
@@ -69,12 +71,14 @@ class LakehousePathResolver:
             else:
                 # Generates nested directories: base_path/etl_name/layer
                 target_dir = os.path.join(base_path, sanitized_layer)
-                checkpoint_dir = os.path.join(base_path, "_checkpoints", checkpoint_suffix)
+                checkpoint_dir = os.path.join(
+                    base_path, "_checkpoints", checkpoint_suffix
+                )
                 quarantine_dir = os.path.join(base_path, "quarantine", sanitized_layer)
 
             self.logger.debug(
                 "Successfully compiled path layout configurations via factory schema mapper for %s layer.",
-                sanitized_layer
+                sanitized_layer,
             )
 
             return LakehousePaths(
@@ -84,4 +88,6 @@ class LakehousePathResolver:
             )
 
         except Exception as exc:
-            raise RuntimeError(f"Lakehouse path resolution failure for: {etl_name}/{layer}") from exc
+            raise RuntimeError(
+                f"Lakehouse path resolution failure for: {etl_name}/{layer}"
+            ) from exc

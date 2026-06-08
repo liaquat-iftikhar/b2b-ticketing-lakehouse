@@ -19,8 +19,12 @@ class EventDataBronzeToSilverTransformer(BaseDataPipeline):
     the Silver tier.
     """
 
-    def __init__(self, execution_date: str, lakehouse_base_path: Optional[str] = None,
-                 etl_name: str = "event_etl") -> None:
+    def __init__(
+        self,
+        execution_date: str,
+        lakehouse_base_path: Optional[str] = None,
+        etl_name: str = "event_etl",
+    ) -> None:
         self.execution_date = execution_date
         self.logger = logging.getLogger(__name__)
 
@@ -28,90 +32,128 @@ class EventDataBronzeToSilverTransformer(BaseDataPipeline):
             execution_date=execution_date,
             layer=Constants.LAYERS.SILVER,
             etl_name=etl_name,
-            lakehouse_base_path=lakehouse_base_path
+            lakehouse_base_path=lakehouse_base_path,
         )
 
         resolver = LakehousePathResolver(lakehouse_base_path=lakehouse_base_path)
-        self.bronze_source_dir = resolver.resolve(layer=Constants.LAYERS.BRONZE, etl_name=etl_name).target_dir
+        self.bronze_source_dir = resolver.resolve(
+            layer=Constants.LAYERS.BRONZE, etl_name=etl_name
+        ).target_dir
 
     def _extract(self) -> DataFrame:
-        self.logger.info("Extracting batch partition data from Event Bronze directory: %s", self.bronze_source_dir)
+        self.logger.info(
+            "Extracting batch partition data from Event Bronze directory: %s",
+            self.bronze_source_dir,
+        )
         return (
-            self.spark.read
-            .format("delta")
+            self.spark.read.format("delta")
             .load(self.bronze_source_dir)
-            .filter(F.col("lh_bronze_execution_date") == F.to_date(F.lit(self.execution_date)))
+            .filter(
+                F.col("lh_bronze_execution_date")
+                == F.to_date(F.lit(self.execution_date))
+            )
         )
 
     def _transform(self, df: DataFrame) -> Tuple[DataFrame, Optional[DataFrame]]:
-        self.logger.info("Executing transactional normalization and schema casting optimization matrix...")
+        self.logger.info(
+            "Executing transactional normalization and schema casting optimization matrix..."
+        )
 
         # Enforce strict data types and map from raw source names
         conformed_df = (
-            df
-            .withColumn("event_name", F.col("name").cast(StringType()))
-            .withColumn("record_inserted_timestamp", F.col("_created_at").cast(TimestampType()))
-            .withColumn("record_last_updated_timestamp", F.col("_updated_at").cast(TimestampType()))
+            df.withColumn("event_name", F.col("name").cast(StringType()))
+            .withColumn(
+                "record_inserted_timestamp", F.col("_created_at").cast(TimestampType())
+            )
+            .withColumn(
+                "record_last_updated_timestamp",
+                F.col("_updated_at").cast(TimestampType()),
+            )
             .drop("_created_at", "_updated_at")
         )
 
-        window_spec = Window.partitionBy("event_id").orderBy(F.col("lh_bronze_inserted_timestamp").desc())
+        window_spec = Window.partitionBy("event_id").orderBy(
+            F.col("lh_bronze_inserted_timestamp").desc()
+        )
 
         deduplicated_df = (
-            conformed_df
-            .withColumn("row_num", F.row_number().over(window_spec))
+            conformed_df.withColumn("row_num", F.row_number().over(window_spec))
             .filter(F.col("row_num") == 1)
             .drop("row_num")
         )
 
         final_silver_df = (
-            deduplicated_df
-            .withColumn("lh_silver_execution_date", F.to_date(F.lit(self.execution_date)))
+            deduplicated_df.withColumn(
+                "lh_silver_execution_date", F.to_date(F.lit(self.execution_date))
+            )
             .withColumn("lh_silver_inserted_timestamp", F.current_timestamp())
             .select(
-                "event_id", "organizer_id", "event_name", "type", "venue", "region", "event_date", "record_inserted_timestamp",
-                "record_last_updated_timestamp", "lh_bronze_execution_date", "lh_bronze_inserted_timestamp",
-                "lh_bronze_source_database_table", "lh_silver_execution_date", "lh_silver_inserted_timestamp"
+                "event_id",
+                "organizer_id",
+                "event_name",
+                "type",
+                "venue",
+                "region",
+                "event_date",
+                "record_inserted_timestamp",
+                "record_last_updated_timestamp",
+                "lh_bronze_execution_date",
+                "lh_bronze_inserted_timestamp",
+                "lh_bronze_source_database_table",
+                "lh_silver_execution_date",
+                "lh_silver_inserted_timestamp",
             )
         )
         return final_silver_df, None
 
-    def _load(self, df_clean: DataFrame, df_quarantine: Optional[DataFrame] = None) -> None:
+    def _load(
+        self, df_clean: DataFrame, df_quarantine: Optional[DataFrame] = None
+    ) -> None:
         delta_log_path = os.path.join(self.lakehouse_paths.target_dir, "_delta_log")
-        table_exists = DeltaTable.isDeltaTable(self.spark, self.lakehouse_paths.target_dir) and os.path.exists(delta_log_path)
+        table_exists = DeltaTable.isDeltaTable(
+            self.spark, self.lakehouse_paths.target_dir
+        ) and os.path.exists(delta_log_path)
 
         if not table_exists:
-            self.logger.info("Target transaction log is missing. Bootstrapping raw Customer Delta table...")
+            self.logger.info(
+                "Target transaction log is missing. Bootstrapping raw Customer Delta table..."
+            )
             (
-                df_clean.write
-                .format("delta")
+                df_clean.write.format("delta")
                 .mode("overwrite")
                 .save(self.lakehouse_paths.target_dir)
             )
         else:
-            self.logger.info("Target Delta table log structure confirmed. Executing merge...")
-            target_table = DeltaTable.forPath(self.spark, self.lakehouse_paths.target_dir)
+            self.logger.info(
+                "Target Delta table log structure confirmed. Executing merge..."
+            )
+            target_table = DeltaTable.forPath(
+                self.spark, self.lakehouse_paths.target_dir
+            )
             (
                 target_table.alias("target")
                 .merge(
                     source=df_clean.alias("updates"),
-                    condition="target.event_id = updates.event_id"
+                    condition="target.event_id = updates.event_id",
                 )
                 .whenMatchedUpdateAll()
                 .whenNotMatchedInsertAll()
                 .execute()
             )
-        self.logger.info("Successfully completed loading conformed metrics into Silver Event Delta layer.")
+        self.logger.info(
+            "Successfully completed loading conformed metrics into Silver Event Delta layer."
+        )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Lakehouse Event Silver Layer Transformer Engine")
+    parser = argparse.ArgumentParser(
+        description="Lakehouse Event Silver Layer Transformer Engine"
+    )
     parser.add_argument("--execution_date", required=True)
     parser.add_argument("--lakehouse_base_path", default=None)
     args = parser.parse_args()
 
     transformer = EventDataBronzeToSilverTransformer(
-        execution_date=args.execution_date,
-        lakehouse_base_path=args.lakehouse_base_path
+        execution_date=args.execution_date, lakehouse_base_path=args.lakehouse_base_path
     )
     transformer.execute()

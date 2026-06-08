@@ -6,12 +6,12 @@ AppConfig (Dynaconf-backed settings.toml + env var overrides).
 
 Every DAG should import from here instead of hardcoding values locally:
 """
+
 import os
 import sys
 from pathlib import Path
 
 from src.config.config_loader import ConfigLoader
-
 
 _config = ConfigLoader.load()
 

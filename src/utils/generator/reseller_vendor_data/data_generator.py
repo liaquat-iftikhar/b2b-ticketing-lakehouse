@@ -1,5 +1,4 @@
 import csv
-import os
 import random
 import uuid
 from datetime import date
@@ -19,17 +18,19 @@ class ResellerSalesCSVGenerator(BaseGenerator):
             unit_price = round(random.uniform(*self.settings.ticket_price_range), 2)
             total = round(qty * unit_price, 2)
 
-            rows.append({
-                "Transaction ID": str(uuid.uuid4()),
-                "Event name": random.choice(self.settings.event_names),
-                "Number of purchased tickets": qty,
-                "Total amount": f"{total:.2f}",
-                "Sales channel": random.choice(self.settings.sales_channels),
-                "Customer first name": self.fake.first_name(),
-                "Customer last name": self.fake.last_name(),
-                "Office location": random.choice(self.settings.office_locations),
-                "Created Date": sale_date.strftime("%Y-%m-%d"),
-            })
+            rows.append(
+                {
+                    "Transaction ID": str(uuid.uuid4()),
+                    "Event name": random.choice(self.settings.event_names),
+                    "Number of purchased tickets": qty,
+                    "Total amount": f"{total:.2f}",
+                    "Sales channel": random.choice(self.settings.sales_channels),
+                    "Customer first name": self.fake.first_name(),
+                    "Customer last name": self.fake.last_name(),
+                    "Office location": random.choice(self.settings.office_locations),
+                    "Created Date": sale_date.strftime("%Y-%m-%d"),
+                }
+            )
         return rows
 
     def populate(self, **dependencies: Any) -> int:

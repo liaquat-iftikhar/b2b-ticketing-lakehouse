@@ -7,8 +7,12 @@ from typing import List, Tuple
 from faker import Faker
 
 from src.config.config_loader import ConfigLoader
-from src.utils.generator.reseller_vendor_data.reseller_sales_csv_settings import ResellerSalesCSVSettings
-from src.utils.generator.reseller_vendor_data.data_generator import ResellerSalesCSVGenerator
+from src.utils.generator.reseller_vendor_data.reseller_sales_csv_settings import (
+    ResellerSalesCSVSettings,
+)
+from src.utils.generator.reseller_vendor_data.data_generator import (
+    ResellerSalesCSVGenerator,
+)
 
 
 class ResellerCSVOrchestrator:
@@ -38,7 +42,9 @@ class ResellerCSVOrchestrator:
         reseller_ids = self._generate_reseller_ids()
         all_exported_files: List[Tuple[str, int]] = []
 
-        print(f"Beginning Reseller Data Engine extraction → output: '{self._output_dir}'")
+        print(
+            f"Beginning Reseller Data Engine extraction → output: '{self._output_dir}'"
+        )
 
         for reseller_id in reseller_ids:
             day_offsets = random.sample(

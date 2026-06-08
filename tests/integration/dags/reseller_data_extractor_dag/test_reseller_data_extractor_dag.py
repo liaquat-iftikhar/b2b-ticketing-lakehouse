@@ -18,6 +18,7 @@ Run with:
     # or discover all integration tests:
     PYTHONPATH=. python -m unittest discover -s tests/integration -p "test_*.py" -v
 """
+
 import os
 import sys
 import tempfile
@@ -28,10 +29,14 @@ from pathlib import Path
 _AIRFLOW_TMP_DIR = tempfile.mkdtemp(prefix="airflow_home_test_")
 os.environ["AIRFLOW_HOME"] = _AIRFLOW_TMP_DIR
 os.environ["AIRFLOW__CORE__LOAD_EXAMPLES"] = "false"
-os.environ["AIRFLOW__DATABASE__SQL_ALCHEMY_CONN"] = f"sqlite:///{_AIRFLOW_TMP_DIR}/airflow.db"
+os.environ["AIRFLOW__DATABASE__SQL_ALCHEMY_CONN"] = (
+    f"sqlite:///{_AIRFLOW_TMP_DIR}/airflow.db"
+)
 
 # ── Ensure project root and dags/ are importable (mirrors Airflow container) ─
-_PROJECT_ROOT = Path(__file__).resolve().parents[4]   # …/tests/integration/dags/<dag>/file → 4 levels up
+_PROJECT_ROOT = (
+    Path(__file__).resolve().parents[4]
+)  # …/tests/integration/dags/<dag>/file → 4 levels up
 _DAGS_FOLDER = _PROJECT_ROOT / "dags"
 
 for _p in (str(_PROJECT_ROOT), str(_DAGS_FOLDER)):
@@ -56,6 +61,7 @@ DELTA_EXTENSIONS_CONF = {
 def setUpModule():
     """Initialise the Airflow metadata DB schema once for the entire module."""
     from airflow.utils.db import initdb
+
     initdb()
 
 
@@ -69,7 +75,8 @@ class TestResellerDataExtractorDagLoad(unittest.TestCase):
     def test_no_import_errors(self) -> None:
         """DagBag must not report any import errors for the DAG module."""
         errors = {
-            k: v for k, v in self.dagbag.import_errors.items()
+            k: v
+            for k, v in self.dagbag.import_errors.items()
             if DAG_ID in k or "reseller_data_extract" in k
         }
         self.assertEqual(errors, {}, msg=f"DAG import errors detected: {errors}")
@@ -127,11 +134,14 @@ class TestResellerDataExtractorDagStructure(unittest.TestCase):
 
     def test_dependency_chain(self) -> None:
         """start_gate → bronze_ingest_reseller_data → silver_transform_purchases → end_gate"""
+
         def downstream_ids(task_id: str) -> set:
             return {t.task_id for t in self.dag.get_task(task_id).downstream_list}
 
         self.assertIn("bronze_ingest_reseller_data", downstream_ids("start_gate"))
-        self.assertIn("silver_transform_purchases", downstream_ids("bronze_ingest_reseller_data"))
+        self.assertIn(
+            "silver_transform_purchases", downstream_ids("bronze_ingest_reseller_data")
+        )
         self.assertIn("end_gate", downstream_ids("silver_transform_purchases"))
 
     def test_start_gate_has_no_upstream(self) -> None:
@@ -150,7 +160,10 @@ class TestBronzeIngestResellerTask(unittest.TestCase):
         cls.task = dagbag.dags[DAG_ID].get_task("bronze_ingest_reseller_data")
 
     def test_operator_type(self) -> None:
-        from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+        from airflow.providers.apache.spark.operators.spark_submit import (
+            SparkSubmitOperator,
+        )
+
         self.assertIsInstance(self.task, SparkSubmitOperator)
 
     def test_conn_id(self) -> None:
@@ -171,7 +184,9 @@ class TestBronzeIngestResellerTask(unittest.TestCase):
     def test_delta_spark_conf(self) -> None:
         conf = self.task.conf or {}
         for key, value in DELTA_EXTENSIONS_CONF.items():
-            self.assertEqual(conf.get(key), value, msg=f"Missing or wrong conf key: {key}")
+            self.assertEqual(
+                conf.get(key), value, msg=f"Missing or wrong conf key: {key}"
+            )
 
     def test_application_args_include_table_reseller(self) -> None:
         """--table reseller must be present so the extractor targets the right source table."""
@@ -204,7 +219,10 @@ class TestSilverTransformResellerTask(unittest.TestCase):
         cls.task = dagbag.dags[DAG_ID].get_task("silver_transform_purchases")
 
     def test_operator_type(self) -> None:
-        from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+        from airflow.providers.apache.spark.operators.spark_submit import (
+            SparkSubmitOperator,
+        )
+
         self.assertIsInstance(self.task, SparkSubmitOperator)
 
     def test_conn_id(self) -> None:
@@ -212,7 +230,9 @@ class TestSilverTransformResellerTask(unittest.TestCase):
 
     def test_application_points_to_reseller_silver_transformer(self) -> None:
         self.assertTrue(
-            self.task.application.endswith("reseller_data_bronze_to_silver_transformer.py"),
+            self.task.application.endswith(
+                "reseller_data_bronze_to_silver_transformer.py"
+            ),
             msg=f"Unexpected application path: {self.task.application}",
         )
 
@@ -222,7 +242,9 @@ class TestSilverTransformResellerTask(unittest.TestCase):
     def test_delta_spark_conf(self) -> None:
         conf = self.task.conf or {}
         for key, value in DELTA_EXTENSIONS_CONF.items():
-            self.assertEqual(conf.get(key), value, msg=f"Missing or wrong conf key: {key}")
+            self.assertEqual(
+                conf.get(key), value, msg=f"Missing or wrong conf key: {key}"
+            )
 
     def test_application_args_include_execution_date_template(self) -> None:
         args = self.task.application_args or []

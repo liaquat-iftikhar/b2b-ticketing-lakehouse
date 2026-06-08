@@ -1,12 +1,10 @@
 from datetime import datetime, timedelta
 from airflow import DAG
-from airflow.decorators import task
 from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 
 from common.datasets import OPERATIONAL_DB_DATA_LOADER_DAG_SUCCESS_DATASET
-from common.dag_config import POSTGRES_CONN_ID, LAKEHOUSE_PATH, PROJECT_ROOT
-
+from common.dag_config import LAKEHOUSE_PATH, PROJECT_ROOT
 
 LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
 SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
@@ -19,14 +17,20 @@ default_args = {
 }
 
 with DAG(
-        dag_id="operational_db_data_loader",
-        default_args=default_args,
-        description="Dag to generate operational db data",
-        schedule=None,
-        start_date=datetime(2026, 6, 1),
-        catchup=False,
-        max_active_runs=1,
-        tags=["operational", "db", "data", "generator", "local"],  # Fixed missing comma string bug
+    dag_id="operational_db_data_loader",
+    default_args=default_args,
+    description="Dag to generate operational db data",
+    schedule=None,
+    start_date=datetime(2026, 6, 1),
+    catchup=False,
+    max_active_runs=1,
+    tags=[
+        "operational",
+        "db",
+        "data",
+        "generator",
+        "local",
+    ],  # Fixed missing comma string bug
 ) as dag:
 
     start_gate = EmptyOperator(task_id="start_gate")

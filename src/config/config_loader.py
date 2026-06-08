@@ -1,6 +1,12 @@
 from src.config.app_config import (
-    AppConfig, AirflowConfig, Environment, _dynaconf,
-    SparkConfig, StorageConfig, StorageType, DatabaseConfig,
+    AppConfig,
+    AirflowConfig,
+    Environment,
+    _dynaconf,
+    SparkConfig,
+    StorageConfig,
+    StorageType,
+    DatabaseConfig,
 )
 
 
@@ -22,7 +28,6 @@ class ConfigLoader:
             airflow=cls._build_airflow(),
         )
 
-
     @classmethod
     def _build_spark(cls) -> SparkConfig:
         s = _dynaconf.get("spark")
@@ -42,7 +47,9 @@ class ConfigLoader:
     def _build_storage(cls) -> StorageConfig:
         s = _dynaconf.get("storage")
         if not s:
-            raise KeyError("Configuration Loading Error: The '[storage]' block is missing.")
+            raise KeyError(
+                "Configuration Loading Error: The '[storage]' block is missing."
+            )
 
         return StorageConfig(
             type=StorageType(s.get("type", "local").lower()),
@@ -62,7 +69,9 @@ class ConfigLoader:
     def _build_database(cls) -> DatabaseConfig:
         d = _dynaconf.get("database")
         if not d:
-            raise KeyError("Configuration Loading Error: The '[database]' block is missing.")
+            raise KeyError(
+                "Configuration Loading Error: The '[database]' block is missing."
+            )
 
         return DatabaseConfig(
             host=d.get("host"),
