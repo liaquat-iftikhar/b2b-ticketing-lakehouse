@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 
 from common.datasets import SALES_REPORT_DAG_SUCCESS_DATASET
@@ -41,11 +42,25 @@ with DAG(
             "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
             "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog"
         },
-        outlets=[SALES_REPORT_DAG_SUCCESS_DATASET],
         application_args=[
             "--execution_date", "{{ ds }}",
             "--lakehouse_base_path", str(LAKEHOUSE_PATH)
         ]
     )
 
-    start_gate >> generate_sales_report >> end_gate
+    sales_report_data_quality_checks = BashOperator(
+        task_id="sales_report_data_quality_checks",
+        cwd="/opt/airflow",
+        env={
+            **os.environ,
+            "PYTHONPATH": os.getenv("PYTHONPATH", str(PROJECT_ROOT)),
+        },
+        outlets=[SALES_REPORT_DAG_SUCCESS_DATASET],
+        bash_command=(
+            "python -m src.dq_checks.sales_report_etl.gold.sales_report_quality_checks"
+            " --execution_date {{ ds }}"
+            f" --lakehouse_base_path {LAKEHOUSE_PATH}"
+        ),
+    )
+
+    start_gate >> generate_sales_report >> sales_report_data_quality_checks >> end_gate

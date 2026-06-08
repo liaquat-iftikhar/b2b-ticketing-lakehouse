@@ -5,3 +5,5 @@ psycopg2-binary==2.9.12
 apache-airflow-providers-apache-spark==6.0.2
 apache-airflow-providers-postgres==6.7.0
 Faker==40.21.0
+great-expectations==1.18.0
+duckdb>=1.1.0

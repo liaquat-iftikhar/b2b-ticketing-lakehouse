@@ -71,6 +71,10 @@ A medallion-architecture data platform for a B2B event ticketing business. Opera
 │   ├── jobs/
 │   │   ├── core/              # BaseDataPipeline ABC + SparkSessionFactory
 │   │   └── <entity>_etl/      # Bronze / Silver / Gold PySpark jobs per entity
+│   ├── dq_checks/
+│   │   └── sales_report_etl/
+│   │       └── gold/
+│   │           └── sales_report_quality_checks.py # Great Expectations DQ checks
 │   └── utils/generator/       # Fake-data generators for local dev seeding
 ├── tests/
 │   ├── unit/
