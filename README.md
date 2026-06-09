@@ -131,13 +131,17 @@ docker compose up -d
 
 Services started:
 
-| Service | URL / Port | Purpose |
-|---------|-----------|---------|
-| `airflow-webserver` | http://localhost:8080 | Airflow UI (admin / admin) |
-| `operational-postgres` | localhost:5432 | Source event platform DB |
-| `airflow-postgres` | localhost:5433 | Airflow metadata DB |
-| `reporting` | http://localhost:8501 | Streamlit BI dashboard |
+| Service                | URL / Port | Purpose |
+|------------------------|-----------|---------|
+| `airflow_webserver`    | http://localhost:8080 | Airflow UI (admin / admin) |
+| `operational_postgres` | localhost:5432 | Source event platform DB |
+| `airflow_postgres`     | localhost:5433 | Airflow metadata DB |
+| `reporting`            | http://localhost:8501 | Streamlit BI dashboard |
 
+> **Note on Airflow Login:** > The default username is `admin`. You can print the password to your terminal by running:
+```bash
+docker logs airflow_webserver 2>&1 | grep "Password for user 'admin':"
+```
 ### 3 — Seed the operational database
 
 **Recommended:** trigger the `operational_db_data_loader` DAG from the Airflow UI at http://localhost:8080. This is a one-off DAG (schedule: `None`) that generates realistic organizers, resellers, customers, events, tickets, and sales records and inserts them directly into PostgreSQL.

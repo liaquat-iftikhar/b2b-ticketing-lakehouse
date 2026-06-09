@@ -31,7 +31,7 @@
 * **Orchestration Validation:** Expand the current `unittest` coverage to catch structural code regressions, checking for DAG cycle errors, verifying task id uniqueness, and testing task configuration objects across different mock variables.
 * **Compute Logic Isolation:** Implement local Spark context testing frameworks to test the internal transformation rules inside `database_table_extractor.py` against predefined mock static test data frames. This isolates pipeline calculation logic testing from database or network connectivity dependencies.
 
-### 2.2 Shift-Left Data Contracts & Ingestion Scopes
+### 2.2 Data Contracts & Ingestion Scopes
 * **Target State:** Implement formal data contract validation rules at the ingestion boundaries.
 * **Impact:** Intercepts corrupted, malformed, or structural schema changes on incoming third-party reseller CSV files (`DailySales_MMDDYYYY_RESELLERID.CSV`) *before* they can enter the storage layer. Any files that fail schema validation are routed to a quarantine path, and an alert is sent, keeping the raw Bronze data tier clear of bad rows.
 
