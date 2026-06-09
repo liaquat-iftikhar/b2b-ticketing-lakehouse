@@ -17,8 +17,10 @@ from src.jobs.core.bronze.db_config_manager import (
 
 class JDBCDatabaseExtractor(BaseDataPipeline):
     """
-    Handles high-throughput, parallelized extraction of relational database tables via JDBC directly into the raw
-    Bronze Delta tier of the Lakehouse. Accepts dynamic execution credentials supplied by upstream orchestrators.
+    Reads a source database table via JDBC and writes it to the Bronze Delta layer.
+
+    Supports optional parallel reads by accepting a JDBCPartitionConfig. Without
+    one, Spark uses a single partition (suitable for small or reference tables).
     """
 
     def __init__(
@@ -29,14 +31,10 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
         partition_config: Optional[JDBCPartitionConfig] = None,
         lakehouse_base_path: Optional[str] = None,
     ) -> None:
-
         self.db_table = db_table
         self.partition_config = partition_config
-
-        # Unpack connection details directly from the manager object
         self.jdbc_url = connection_manager.jdbc_url
         self.db_properties = connection_manager.db_properties
-
         self.logger = logging.getLogger(__name__)
 
         super().__init__(
@@ -47,10 +45,7 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
         )
 
     def _extract(self) -> DataFrame:
-        """Establishes parallelized JDBC partition read pathways to dump source tables."""
-        self.logger.info(
-            "Initializing JDBC reader connection pool for table: %s", self.db_table
-        )
+        self.logger.info("Reading table '%s' via JDBC.", self.db_table)
 
         reader = self.spark.read.format("jdbc").options(
             url=self.jdbc_url, dbtable=self.db_table, **self.db_properties
@@ -58,7 +53,11 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
 
         if self.partition_config:
             self.logger.info(
-                "Injecting dynamic optimization partition configurations into the JDBC read graph."
+                "Applying partition config: column=%s, bounds=[%s, %s], partitions=%s",
+                self.partition_config.column,
+                self.partition_config.lower_bound,
+                self.partition_config.upper_bound,
+                self.partition_config.num_partitions,
             )
             reader = (
                 reader.option("partitionColumn", self.partition_config.column)
@@ -70,10 +69,8 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
         return reader.load()
 
     def _transform(self, df: DataFrame) -> Tuple[DataFrame, Optional[DataFrame]]:
-        """Applies infrastructure data lineage stamps to incoming source records."""
-        self.logger.info(
-            "Stamping database payloads with active ingestion lineage properties..."
-        )
+        """Add Bronze lineage columns: execution date, ingest timestamp, and source table name."""
+        self.logger.info("Adding lineage columns to '%s' extract.", self.db_table)
 
         enriched_df = (
             df.withColumn(
@@ -88,12 +85,8 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
     def _load(
         self, df_clean: DataFrame, df_quarantine: Optional[DataFrame] = None
     ) -> None:
-        """Appends raw operational system database extracts directly into a Bronze Delta table."""
         target_dir = self.lakehouse_paths.target_dir
-        self.logger.info(
-            "Writing transactional database snapshot to Bronze Delta location: %s",
-            target_dir,
-        )
+        self.logger.info("Writing Bronze Delta table to: %s", target_dir)
 
         (
             df_clean.write.format("delta")
@@ -101,46 +94,24 @@ class JDBCDatabaseExtractor(BaseDataPipeline):
             .option("mergeSchema", "true")
             .save(target_dir)
         )
-        self.logger.info(
-            "Database extraction ingestion sequence completed successfully."
-        )
+        self.logger.info("Bronze ingestion complete for table '%s'.", self.db_table)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Relational Database Medallion Bronze Ingestion Job"
-    )
-    parser.add_argument(
-        "--table",
-        required=True,
-        help="Target relational database source table name string.",
-    )
-    parser.add_argument(
-        "--execution_date",
-        required=True,
-        help="Logical date execution block (YYYY-MM-DD)",
-    )
+    parser = argparse.ArgumentParser(description="Bronze JDBC ingestion job")
+    parser.add_argument("--table", required=True, help="Source database table name.")
+    parser.add_argument("--execution_date", required=True, help="Logical date (YYYY-MM-DD).")
     parser.add_argument(
         "--lakehouse_base_path",
         required=True,
-        help="Base directory for lakehouse. Supports local system paths or s3a:// bucket URIs.",
+        help="Lakehouse root — local path or s3a:// URI.",
     )
-
-    # Explicit connection parameters exposed to CLI for ad-hoc manual testing runs
-    parser.add_argument("--db_host", required=True, help="The host URI string.")
+    parser.add_argument("--db_host", required=True)
+    parser.add_argument("--db_user", required=True)
+    parser.add_argument("--db_password", required=True)
+    parser.add_argument("--db_port", required=True)
     parser.add_argument(
-        "--db_user", required=True, help="Authorized username credential identifier."
-    )
-    parser.add_argument(
-        "--db_password",
-        required=True,
-        help="Authorized execution security secret token.",
-    )
-    parser.add_argument("--db_port", required=True, help="Port to connect to database.")
-    parser.add_argument(
-        "--db_driver",
-        default="org.postgresql.Driver",
-        help="Java target execution class connector driver.",
+        "--db_driver", default="org.postgresql.Driver", help="JDBC driver class."
     )
     args = parser.parse_args()
 
@@ -149,26 +120,27 @@ if __name__ == "__main__":
     os.environ["DB_USER"] = args.db_user
     os.environ["DB_PASSWORD"] = args.db_password
     os.environ["DB_DRIVER"] = args.db_driver
-    os.environ["DB_DRIVER"] = args.db_driver
 
     db_config = DatabaseConfig(
         host=args.db_host,
         port=int(args.db_port),
         user=args.db_user,
         password=args.db_password,
-        name="event_platform",  # Target source transaction database name
-        driver="org.postgresql.Driver",
+        name="event_platform",
+        driver=args.db_driver,
     )
 
     conn_manager = DBConnectionManager(db_config=db_config)
 
+    # Uncomment and tune for large tables that benefit from parallel reads:
     # tuning_strategy = JDBCPartitionConfig(
     #     column="id",
     #     lower_bound="1",
     #     upper_bound="1000000",
-    #     num_partitions="8"
+    #     num_partitions="8",
     # )
     tuning_strategy = None
+
     extractor = JDBCDatabaseExtractor(
         db_table=args.table,
         execution_date=args.execution_date,

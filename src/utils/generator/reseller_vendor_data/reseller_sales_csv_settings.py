@@ -88,5 +88,5 @@ class ResellerSalesCSVSettings(BaseGeneratorSettings):
 
     @property
     def total_days_range(self) -> int:
-        """Dynamically computes total tracking matrix spectrum span."""
+        """Number of days between date_start and date_end, used as the sampling pool size."""
         return (self.date_end - self.date_start).days

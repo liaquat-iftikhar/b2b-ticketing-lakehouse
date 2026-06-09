@@ -23,9 +23,7 @@ class JDBCPartitionConfig:
 
 
 class DBConnectionManager:
-    """
-    Handles secure credential acquisition and connection parameter management.
-    """
+    """Exposes JDBC URL and connection properties derived from a DatabaseConfig."""
 
     def __init__(self, db_config: DatabaseConfig) -> None:
         self._config = db_config

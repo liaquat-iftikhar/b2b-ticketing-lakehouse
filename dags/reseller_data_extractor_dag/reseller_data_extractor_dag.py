@@ -71,7 +71,7 @@ with DAG(
     )
 
     transform_reseller_silver = SparkSubmitOperator(
-        task_id="silver_transform_purchases",
+        task_id="silver_transform_resellers",
         application=str(
             SRC_JOBS_ROOT
             / "reseller_etl"

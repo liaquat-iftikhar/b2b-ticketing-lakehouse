@@ -1,8 +1,9 @@
 import logging
 import random
 from pathlib import Path
-from faker import Faker
+
 import psycopg2
+from faker import Faker
 
 from src.config.app_config import DatabaseConfig
 from src.config.config_loader import ConfigLoader
@@ -14,18 +15,18 @@ from src.utils.generator.operational_db.core.db_generator_settings import (
     DBGeneratorSettings,
 )
 from src.utils.generator.operational_db.data_generators import (
-    OrganizerGenerator,
-    ResellerGenerator,
     CommissionAgreementGenerator,
     CustomerGenerator,
     EventGenerator,
-    TicketGenerator,
+    OrganizerGenerator,
+    ResellerGenerator,
     SaleGenerator,
+    TicketGenerator,
 )
 
 
 class PlatformOrchestrator:
-    """Orchestrates seed environments and schedules sequential data generation tasks."""
+    """Seeds the operational database with synthetic platform data in dependency order."""
 
     def __init__(self, db_config: DatabaseConfig, settings: BaseGeneratorSettings):
         self._db_config = db_config
@@ -36,41 +37,32 @@ class PlatformOrchestrator:
         random.seed(self._settings.seed)
 
     def execute_schema_initialization(self) -> None:
-        """Reads the source relational DDL structure from disk and applies it to the DB."""
+        """Read schema.sql from disk and apply it to the database."""
         schema_path = Path(__file__).resolve().parent / "schema.sql"
         try:
             with open(schema_path, "r", encoding="utf-8") as f:
                 ddl_script = f.read()
         except OSError as e:
-            self.logger.error(
-                "Failed to read schema SQL file from %s: %s", schema_path, e
-            )
+            self.logger.error("Could not read schema file %s: %s", schema_path, e)
             raise
 
-        self.logger.info("Initializing database schema using %s...", schema_path)
-
+        self.logger.info("Applying schema from %s...", schema_path)
         db_manager = DatabaseConnectionManager(self._db_config)
         try:
             with db_manager as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(ddl_script)
-            self.logger.info("Database schema initialized successfully.")
+            self.logger.info("Schema applied successfully.")
         except psycopg2.Error as error:
-            self.logger.error("Database schema initialization failed: %s", error)
+            self.logger.error("Schema initialization failed: %s", error)
             raise
 
     def run(self) -> None:
-        print("Verifying and applying database structural schema...")
         self.execute_schema_initialization()
 
-        print("Initializing database secure pipe context...")
         db_manager = DatabaseConnectionManager(self._db_config)
-
         with db_manager as connection:
             with connection.cursor() as cursor:
-                print("Generating domain records across infrastructure targets...")
-
-                # Instantiations
                 organizer_gen = OrganizerGenerator(self._fake, self._settings)
                 reseller_gen = ResellerGenerator(self._fake, self._settings)
                 agreement_gen = CommissionAgreementGenerator(self._fake, self._settings)
@@ -81,6 +73,7 @@ class PlatformOrchestrator:
 
                 org_ids = organizer_gen.populate(cursor)
                 res_ids = reseller_gen.populate(cursor)
+                # agreements maps (organizer_id, reseller_id) -> (agreement_id, rate)
                 agreements = agreement_gen.populate(
                     cursor, organizer_ids=org_ids, reseller_ids=res_ids
                 )

@@ -1,23 +1,29 @@
+import functools
+
 from src.config.app_config import (
     AppConfig,
     AirflowConfig,
+    DatabaseConfig,
     Environment,
-    _dynaconf,
     SparkConfig,
     StorageConfig,
     StorageType,
-    DatabaseConfig,
+    _dynaconf,
 )
 
 
 class ConfigLoader:
-    """
-    Reads the active Dynaconf settings and returns a fully typed AppConfig.
-    """
+    """Parses Dynaconf settings into a typed AppConfig."""
 
     @classmethod
+    @functools.lru_cache(maxsize=1)
     def load(cls) -> AppConfig:
+        """
+        Return the application config, reading settings files at most once per process.
 
+        The result is cached so repeated imports during Airflow DAG parsing do not
+        re-read settings.toml on every scheduler cycle.
+        """
         current_env_raw = _dynaconf.get("current_env", "local")
 
         return AppConfig(
@@ -33,8 +39,8 @@ class ConfigLoader:
         s = _dynaconf.get("spark")
         if not s:
             raise KeyError(
-                f"Configuration Loading Error: The '[spark]' block is missing. "
-                f"Active environment profile is [{_dynaconf.current_env}]."
+                f"Missing '[spark]' block in settings "
+                f"(active env: {_dynaconf.current_env})."
             )
 
         return SparkConfig(
@@ -47,9 +53,7 @@ class ConfigLoader:
     def _build_storage(cls) -> StorageConfig:
         s = _dynaconf.get("storage")
         if not s:
-            raise KeyError(
-                "Configuration Loading Error: The '[storage]' block is missing."
-            )
+            raise KeyError("Missing '[storage]' block in settings.")
 
         return StorageConfig(
             type=StorageType(s.get("type", "local").lower()),
@@ -69,9 +73,7 @@ class ConfigLoader:
     def _build_database(cls) -> DatabaseConfig:
         d = _dynaconf.get("database")
         if not d:
-            raise KeyError(
-                "Configuration Loading Error: The '[database]' block is missing."
-            )
+            raise KeyError("Missing '[database]' block in settings.")
 
         return DatabaseConfig(
             host=d.get("host"),

@@ -26,8 +26,10 @@ class UnifiedSalesSources:
 
 class SalesReportETL(BaseDataPipeline):
     """
-    Combines core platform transactions and reseller CSV data into a single unified sales in the Silver layer.
-    Resolve other columns for analysis
+    Gold ETL that merges platform sales and reseller CSV sales into one unified fact table.
+
+    Joins against Silver dimension tables (event, ticket, customer, reseller,
+    commission_agreement) to produce a denormalized analytical dataset.
     """
 
     def __init__(
@@ -70,10 +72,14 @@ class SalesReportETL(BaseDataPipeline):
         ).target_dir
 
     def _extract(self) -> UnifiedSalesSources:
-        """Extracts the daily incremental chunk for sales datasets and broad states for lookups."""
-        self.logger.info(
-            "Extracting incremental raw partition updates from Silver storage layer..."
-        )
+        """
+        Load today's incremental sales partitions and full dimension snapshots from Silver.
+
+        Sale and reseller_sale tables are filtered to the execution_date partition.
+        Lookup tables (event, ticket, customer, reseller, commission_agreement) are
+        loaded in full because they are small enough to broadcast.
+        """
+        self.logger.info("Extracting Silver data for partition: %s", self.execution_date)
 
         sale_df = (
             self.spark.read.format("delta")
@@ -114,9 +120,7 @@ class SalesReportETL(BaseDataPipeline):
     def _transform(
         self, sources: UnifiedSalesSources
     ) -> Tuple[DataFrame, Optional[DataFrame]]:
-        self.logger.info(
-            "Executing analytical star-schema denormalization matrix joins..."
-        )
+        self.logger.info("Joining Silver dimensions and unioning platform + reseller sales.")
 
         pruned_events = sources.event.select(
             "event_id", "organizer_id", "event_name", "type", "region"
@@ -223,7 +227,12 @@ class SalesReportETL(BaseDataPipeline):
         df_unified_sales = standardized_platform_sale_df.unionByName(
             enriched_reseller_sale_df
         )
-        df_final_clean = df_unified_sales.dropDuplicates(["sale_id", "reseller_id"])
+        df_final_clean = (
+            df_unified_sales
+            .dropDuplicates(["sale_id", "reseller_id"])
+            .withColumn("lh_gold_execution_date", F.to_date(F.lit(self.execution_date)))
+            .withColumn("lh_gold_inserted_timestamp", F.current_timestamp())
+        )
 
         return df_final_clean, None
 
@@ -237,7 +246,8 @@ class SalesReportETL(BaseDataPipeline):
 
         if not table_exists:
             self.logger.info(
-                "Target transaction log is missing or uninitialized. Bootstrapping raw Delta table structure..."
+                "Gold table not found at %s — writing initial snapshot.",
+                self.lakehouse_paths.target_dir,
             )
             (
                 df_clean.write.format("delta")
@@ -246,13 +256,13 @@ class SalesReportETL(BaseDataPipeline):
             )
         else:
             self.logger.info(
-                "Target Delta table log structure confirmed. Instantiating matching merge layout..."
+                "Gold table exists — running MERGE on (sale_id, reseller_id)."
             )
             target_table = DeltaTable.forPath(
                 self.spark, self.lakehouse_paths.target_dir
             )
-            merge_condition = "target.sale_id = updates.sale_id"
-            merge_condition += (
+            merge_condition = (
+                "target.sale_id = updates.sale_id"
                 " AND target.reseller_id IS NOT DISTINCT FROM updates.reseller_id"
             )
             (
@@ -266,15 +276,11 @@ class SalesReportETL(BaseDataPipeline):
                 .execute()
             )
 
-        self.logger.info(
-            "Successfully completed loading conformed metrics into Silver Delta layer."
-        )
+        self.logger.info("Gold Delta table load complete.")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Lakehouse Gold Corporate Analytical Modeler Engine"
-    )
+    parser = argparse.ArgumentParser(description="Gold sales report ETL job")
     parser.add_argument("--execution_date", required=True)
     parser.add_argument("--lakehouse_base_path", default=None)
     args = parser.parse_args()

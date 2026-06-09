@@ -4,10 +4,8 @@ from airflow.providers.standard.operators.bash import BashOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 
 from common.datasets import RESELLER_VENDOR_DATA_LOADER_DAG_SUCCESS_DATASET
-from common.dag_config import LAKEHOUSE_PATH, PROJECT_ROOT
+from common.dag_config import SRC_JOBS_ROOT
 
-LAKEHOUSE_PATH = PROJECT_ROOT / "data" / "lakehouse"
-SRC_JOBS_ROOT = PROJECT_ROOT / "src" / "jobs"
 
 default_args = {
     "owner": "data_platform_team",
@@ -19,7 +17,7 @@ default_args = {
 with DAG(
     dag_id="reseller_vendor_data_loader",
     default_args=default_args,
-    description="Dag to generate operational db data",
+    description="Generate reseller vendor CSV data into the inbound landing zone.",
     schedule=None,
     start_date=datetime(2026, 6, 1),
     catchup=False,
@@ -34,9 +32,9 @@ with DAG(
         cwd="/opt/airflow",
         outlets=[RESELLER_VENDOR_DATA_LOADER_DAG_SUCCESS_DATASET],
         bash_command=(
-            "echo 'Starting reseller sales data orchestrator process loop...' && "
+            "echo 'Starting reseller vendor data generator...' && "
             "python -m src.utils.generator.reseller_vendor_data.orchestrator && "
-            "echo 'Reseller vendor data script completed successfully.'"
+            "echo 'Reseller vendor data generation completed.'"
         ),
     )
 

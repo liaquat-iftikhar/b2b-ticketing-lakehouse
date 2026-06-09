@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 import duckdb
 import streamlit as st
 
@@ -5,18 +7,17 @@ from reporting.duckdb_model import DuckDBModel
 
 
 class DashboardFilters:
-    """Manages the state, widgets, and parsing logic for dynamic runtime query parameters."""
+    """Sidebar filter state for the sales dashboard."""
 
     def __init__(self, model: DuckDBModel):
         self.model = model
-        self.selected_event_types = []
-        self.selected_resellers = []
+        self.selected_event_types: List[str] = []
+        self.selected_resellers: List[str] = []
 
-    def render_sidebar(self):
-        """Builds interactive navigation selectors in the Streamlit Sidebar container."""
+    def render_sidebar(self) -> None:
+        """Render multiselect widgets and update the current filter state."""
         st.sidebar.header("Data Warehouse Filters")
 
-        # Load unique dimensions dynamically using static safe cache blocks
         event_opts, reseller_opts = self._fetch_dimensions(self.model.warehouse_path)
 
         self.selected_event_types = st.sidebar.multiselect(
@@ -30,57 +31,69 @@ class DashboardFilters:
 
     @staticmethod
     @st.cache_data(ttl=60)
-    def _fetch_dimensions(path: str):
-        """Static cached query extractor protecting instance serialization tracking loops."""
-        con = duckdb.connect(database=":memory:")
-        con.execute("INSTALL delta; LOAD delta;")
+    def _fetch_dimensions(path: str) -> Tuple[List[str], List[str]]:
+        """
+        Load distinct event types and resellers from the Delta table.
 
-        event_types = (
-            con.execute(
-                f"SELECT DISTINCT event_type FROM delta_scan('{path}') WHERE event_type IS NOT NULL"
+        Cached as a static method to avoid serializing the DuckDBModel instance,
+        which Streamlit cannot hash. The connection is closed after each call.
+        """
+        con = duckdb.connect(database=":memory:")
+        try:
+            con.execute("INSTALL delta; LOAD delta;")
+            event_types = (
+                con.execute(
+                    f"SELECT DISTINCT event_type FROM delta_scan('{path}') WHERE event_type IS NOT NULL"
+                )
+                .fetchdf()["event_type"]
+                .tolist()
             )
-            .fetchdf()["event_type"]
-            .tolist()
-        )
-        resellers = (
-            con.execute(
-                f"SELECT DISTINCT COALESCE(reseller_id, 'Direct Platform Sale') as reseller FROM delta_scan('{path}')"
+            resellers = (
+                con.execute(
+                    f"SELECT DISTINCT COALESCE(reseller_id, 'Direct Platform Sale') AS reseller"
+                    f" FROM delta_scan('{path}')"
+                )
+                .fetchdf()["reseller"]
+                .tolist()
             )
-            .fetchdf()["reseller"]
-            .tolist()
-        )
+        finally:
+            con.close()
         return event_types, resellers
 
-    def get_where_clause(self) -> str:
-        """Compiles selections into valid SQL, preventing exceptions when filters are unset."""
+    def get_filter(self) -> Tuple[str, List]:
+        """
+        Build a parameterized WHERE clause from current selections.
 
+        Returns a (sql_fragment, params) tuple. The SQL uses positional '?'
+        placeholders so values are never interpolated directly into the query
+        string, preventing SQL injection.
+        """
         if not self.selected_event_types or not self.selected_resellers:
-            return "WHERE 1=0"
+            return "WHERE 1=0", []
 
-        where_clause = "WHERE 1=1"
+        params: List = []
+        conditions: List[str] = []
 
-        if len(self.selected_event_types) == 1:
-            where_clause += f" AND event_type = '{self.selected_event_types[0]}'"
-        else:
-            where_clause += f" AND event_type IN {tuple(self.selected_event_types)}"
+        # Event type filter
+        placeholders = ", ".join("?" * len(self.selected_event_types))
+        conditions.append(f"event_type IN ({placeholders})")
+        params.extend(self.selected_event_types)
 
-        reseller_filter = [
-            r for r in self.selected_resellers if r != "Direct Platform Sale"
-        ]
-        conditions = []
+        # Reseller filter — "Direct Platform Sale" is a display sentinel for NULL reseller_id
+        named_resellers = [r for r in self.selected_resellers if r != "Direct Platform Sale"]
+        reseller_parts: List[str] = []
 
-        if reseller_filter:
-            if len(reseller_filter) == 1:
-                conditions.append(f"reseller_id = '{reseller_filter[0]}'")
-            else:
-                conditions.append(f"reseller_id IN {tuple(reseller_filter)}")
+        if named_resellers:
+            rp = ", ".join("?" * len(named_resellers))
+            reseller_parts.append(f"reseller_id IN ({rp})")
+            params.extend(named_resellers)
 
         if "Direct Platform Sale" in self.selected_resellers:
-            conditions.append("reseller_id IS NULL")
+            reseller_parts.append("reseller_id IS NULL")
 
-        if conditions:
-            where_clause += f" AND ({' OR '.join(conditions)})"
-        else:
-            return "WHERE 1=0"
+        if not reseller_parts:
+            return "WHERE 1=0", []
 
-        return where_clause
+        conditions.append(f"({' OR '.join(reseller_parts)})")
+
+        return "WHERE " + " AND ".join(conditions), params

@@ -1,14 +1,13 @@
 import random
 import uuid
 from decimal import Decimal
-from typing import Any, Dict, List, Tuple
-
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.utils.generator.common.base_generator import BaseGenerator
 
 
 class OrganizerGenerator(BaseGenerator):
-    def populate(self, cursor: Any, **dependencies: Any) -> List[str]:
+    def populate(self, cursor: Optional[Any] = None, **dependencies: Any) -> List[str]:
         rows = []
         for _ in range(self.settings.num_organizers):
             organizer_id = str(uuid.uuid4())
@@ -27,16 +26,15 @@ class OrganizerGenerator(BaseGenerator):
                VALUES (%s, %s, %s, %s, %s)""",
             rows,
         )
-        print(f"{len(rows)} organizers populated.")
+        print(f"{len(rows)} organizers inserted.")
         return [r[0] for r in rows]
 
 
 class ResellerGenerator(BaseGenerator):
-    def populate(self, cursor: Any, **dependencies: Any) -> List[str]:
+    def populate(self, cursor: Optional[Any] = None, **dependencies: Any) -> List[str]:
         rows = []
         for _ in range(self.settings.num_resellers):
             reseller_id = str(uuid.uuid4())
-            region = random.choice(self.settings.regions)
             rows.append(
                 (
                     reseller_id,
@@ -45,7 +43,7 @@ class ResellerGenerator(BaseGenerator):
                     self.fake.phone_number()[:50],
                     self.fake.city(),
                     self.fake.country(),
-                    region,
+                    random.choice(self.settings.regions),
                 )
             )
 
@@ -54,17 +52,25 @@ class ResellerGenerator(BaseGenerator):
                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
             rows,
         )
-        print(f"{len(rows)} resellers populated.")
+        print(f"{len(rows)} resellers inserted.")
         return [r[0] for r in rows]
 
 
 class CommissionAgreementGenerator(BaseGenerator):
-    def populate(self, cursor: Any, **dependencies: Any) -> Dict[Tuple[str, str], str]:
-        organizer_ids = dependencies["organizer_ids"]
-        reseller_ids = dependencies["reseller_ids"]
+    def populate(
+        self, cursor: Optional[Any] = None, **dependencies: Any
+    ) -> Dict[Tuple[str, str], Tuple[str, Decimal]]:
+        """
+        Insert commission agreements and return a mapping of
+        (organizer_id, reseller_id) -> (agreement_id, commission_rate).
+
+        Returning the rate here avoids a per-sale lookup in SaleGenerator.
+        """
+        organizer_ids: List[str] = dependencies["organizer_ids"]
+        reseller_ids: List[str] = dependencies["reseller_ids"]
 
         rows = []
-        seen = set()
+        seen: set = set()
         for reseller_id in reseller_ids:
             sampled_organizers = random.sample(
                 organizer_ids, k=min(3, len(organizer_ids))
@@ -73,26 +79,21 @@ class CommissionAgreementGenerator(BaseGenerator):
                 if (organizer_id, reseller_id) in seen:
                     continue
                 seen.add((organizer_id, reseller_id))
-                rows.append(
-                    (
-                        str(uuid.uuid4()),
-                        organizer_id,
-                        reseller_id,
-                        Decimal(str(random.choice(self.settings.commission_rates))),
-                    )
-                )
+                rate = Decimal(str(random.choice(self.settings.commission_rates)))
+                rows.append((str(uuid.uuid4()), organizer_id, reseller_id, rate))
 
         cursor.executemany(
             """INSERT INTO commission_agreement (agreement_id, organizer_id, reseller_id, commission_rate)
                VALUES (%s, %s, %s, %s)""",
             rows,
         )
-        print(f"{len(rows)} commission agreements populated.")
-        return {(r[1], r[2]): r[0] for r in rows}
+        print(f"{len(rows)} commission agreements inserted.")
+        # Return (agreement_id, rate) so callers don't need a separate DB lookup.
+        return {(r[1], r[2]): (r[0], r[3]) for r in rows}
 
 
 class CustomerGenerator(BaseGenerator):
-    def populate(self, cursor: Any, **dependencies: Any) -> List[str]:
+    def populate(self, cursor: Optional[Any] = None, **dependencies: Any) -> List[str]:
         rows = []
         for _ in range(self.settings.num_customers):
             rows.append(
@@ -111,13 +112,15 @@ class CustomerGenerator(BaseGenerator):
                VALUES (%s, %s, %s, %s, %s, %s)""",
             rows,
         )
-        print(f"{len(rows)} customers populated.")
+        print(f"{len(rows)} customers inserted.")
         return [r[0] for r in rows]
 
 
 class EventGenerator(BaseGenerator):
-    def populate(self, cursor: Any, **dependencies: Any) -> List[Tuple[str, str]]:
-        organizer_ids = dependencies["organizer_ids"]
+    def populate(
+        self, cursor: Optional[Any] = None, **dependencies: Any
+    ) -> List[Tuple[str, str]]:
+        organizer_ids: List[str] = dependencies["organizer_ids"]
         rows = []
         for _ in range(self.settings.num_events):
             rows.append(
@@ -137,13 +140,15 @@ class EventGenerator(BaseGenerator):
                VALUES (%s, %s, %s, %s, %s, %s, %s)""",
             rows,
         )
-        print(f"{len(rows)} events populated.")
+        print(f"{len(rows)} events inserted.")
         return [(r[0], r[1]) for r in rows]
 
 
 class TicketGenerator(BaseGenerator):
-    def populate(self, cursor: Any, **dependencies: Any) -> List[Tuple[str, str]]:
-        events = dependencies["events"]
+    def populate(
+        self, cursor: Optional[Any] = None, **dependencies: Any
+    ) -> List[Tuple[str, str]]:
+        events: List[Tuple[str, str]] = dependencies["events"]
         rows = []
         for _ in range(self.settings.num_tickets):
             event_id, _ = random.choice(events)
@@ -162,19 +167,25 @@ class TicketGenerator(BaseGenerator):
                VALUES (%s, %s, %s, %s)""",
             rows,
         )
-        print(f"{len(rows)} tickets populated.")
+        print(f"{len(rows)} tickets inserted.")
         return [(r[0], r[1]) for r in rows]
 
 
 class SaleGenerator(BaseGenerator):
-    def populate(self, cursor: Any, **dependencies: Any) -> None:
-        tickets = dependencies["tickets"]
-        events = dependencies["events"]
-        customer_ids = dependencies["customer_ids"]
-        reseller_ids = dependencies["reseller_ids"]
-        agreements = dependencies["agreements"]
-        count = dependencies["count"]
-        source = dependencies.get("source", "platform")
+    def populate(self, cursor: Optional[Any] = None, **dependencies: Any) -> None:
+        """
+        Generate and insert sale records.
+
+        Commission rates are read from the agreements dict (which now carries the
+        rate alongside the agreement_id) rather than issuing one SELECT per sale.
+        """
+        tickets: List[Tuple[str, str]] = dependencies["tickets"]
+        events: List[Tuple[str, str]] = dependencies["events"]
+        customer_ids: List[str] = dependencies["customer_ids"]
+        reseller_ids: List[str] = dependencies["reseller_ids"]
+        agreements: Dict[Tuple[str, str], Tuple[str, Decimal]] = dependencies["agreements"]
+        count: int = dependencies["count"]
+        source: str = dependencies.get("source", "platform")
 
         event_organizer_map = {event_id: org_id for event_id, org_id in events}
         rows = []
@@ -187,27 +198,19 @@ class SaleGenerator(BaseGenerator):
             unit_price = round(random.uniform(15, 500), 2)
             total = round(unit_price * qty, 2)
 
-            use_reseller = random.random() < 0.60
             reseller_id = None
             agreement_id = None
             commission = Decimal("0")
 
-            if use_reseller:
-                eligible_resellers = [
+            if random.random() < 0.60:
+                eligible = [
                     (rid, agreements[(organizer_id, rid)])
                     for rid in reseller_ids
                     if (organizer_id, rid) in agreements
                 ]
-                if eligible_resellers:
-                    reseller_id, agreement_id = random.choice(eligible_resellers)
-                    cursor.execute(
-                        "SELECT commission_rate FROM commission_agreement WHERE agreement_id = %s",
-                        (agreement_id,),
-                    )
-                    rate = cursor.fetchone()[0]
+                if eligible:
+                    reseller_id, (agreement_id, rate) = random.choice(eligible)
                     commission = round(Decimal(str(total)) * rate / 100, 2)
-                else:
-                    use_reseller = False
 
             rows.append(
                 (
@@ -235,4 +238,4 @@ class SaleGenerator(BaseGenerator):
                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
             rows,
         )
-        print(f"{len(rows)} sales populated from source: '{source}'.")
+        print(f"{len(rows)} sales inserted (source: '{source}').")
