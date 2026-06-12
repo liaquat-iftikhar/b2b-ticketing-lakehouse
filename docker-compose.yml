@@ -1,0 +1,223 @@
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  environment: &airflow-common-env
+    # ---- Airflow core ----
+    AIRFLOW_HOME: /opt/airflow
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+
+    # ---- Airflow 3 Task Execution API Configuration
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver:8080/execution/"
+    AIRFLOW__API_AUTH__JWT_SECRET: "local-dev-jwt-token-secret-key-must-be-32-bytes"
+
+    # ---- Logging ----
+    AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+    AIRFLOW__LOGGING__REMOTE_LOGGING: "false"
+    AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+    AIRFLOW__LOGGING__FAB_LOGGING_LEVEL: WARN
+    AIRFLOW__LOGGING__COLORED_CONSOLE_LOG: "false"
+
+    # ---- Airflow connections (names must match conn IDs in settings.toml [default.airflow]) ----
+    AIRFLOW_CONN_SPARK_LOCAL: '{"conn_type": "spark", "host": "local[*]"}'
+    AIRFLOW_CONN_POSTGRES_EVENT_PLATFORM: '{"conn_type": "postgres", "host": "operational-postgres", "port": 5432, "login": "postgres", "password": "postgres", "schema": "event_platform"}'
+    AIRFLOW_CONN_SPARK_DEFAULT: '{"conn_type": "spark", "host": "local[*]", "extra": {"spark.pyspark.python": "/usr/local/bin/python3", "spark.pyspark.driver.python": "/usr/local/bin/python3", "spark.jars.ivy": "/home/airflow/.ivy2"}}'
+    AIRFLOW_CONN_POSTGRES_DEFAULT: '{"conn_type": "postgres", "host": "operational-postgres", "port": 5432, "login": "postgres", "password": "postgres", "schema": "event_platform"}'
+
+    # ---- Database (Airflow metadata) ----
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: >-
+      postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+
+    # ---- Security ----
+    AIRFLOW__CORE__FERNET_KEY: "uQ4LmIibVt_mGNVfpVJ_ks7SWr9oEVq7JwkPb5YqWUQ="
+    AIRFLOW__WEBSERVER__SECRET_KEY: "local-dev-secret-do-not-use-in-prod"
+
+    # ---- Project config (Dynaconf) ----
+    PYTHONPATH: /opt/airflow
+    ENV_FOR_DYNACONF: local
+    DYNACONF_DATABASE__HOST: operational-postgres
+    DYNACONF_DATABASE__PORT: "5432"
+    DYNACONF_DATABASE__NAME: event_platform
+    DYNACONF_DATABASE__USER: postgres
+    DYNACONF_DATABASE__PASSWORD: postgres
+    DYNACONF_STORAGE__BASE_PATH: /opt/airflow/data/lakehouse
+
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./src:/opt/airflow/src
+    - ./config:/opt/airflow/config
+    - ./data:/opt/airflow/data
+    - airflow_logs:/opt/airflow/logs
+    - airflow_ivy_cache:/home/airflow/.ivy2
+
+  networks:
+    - etl_net
+
+  depends_on:
+    airflow-postgres:
+      condition: service_healthy
+    operational-postgres:
+      condition: service_healthy
+
+
+services:
+
+  # ---------- Databases -------------------------------------------------------
+
+  airflow-postgres:
+    image: postgres:15-alpine
+    container_name: airflow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    ports:
+      - "5433:5432"
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl_net
+
+  operational-postgres:
+    image: postgres:15-alpine
+    container_name: operational_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: event_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - operational_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl_net
+
+  # ---------- Airflow ---------------------------------------------------------
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow_init
+    restart: "no"
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    command: db migrate
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow_webserver
+    restart: unless-stopped
+    command: api-server
+    ports:
+      - "8080:8080"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      operational-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /opt/airflow/airflow-api-server.pid ]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: airflow_dag_processor
+    restart: unless-stopped
+    command: dag-processor
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      operational-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow_scheduler
+    restart: unless-stopped
+    command: scheduler
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      operational-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: airflow_triggerer
+    restart: unless-stopped
+    command: triggerer
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      operational-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+
+  # ---------- Reporting ------------------------------------------------------
+  reporting:
+    build:
+      context: .
+      dockerfile: Dockerfile.reporting
+    container_name: streamlit_dashboard
+    restart: unless-stopped
+    entrypoint: []
+    ports:
+      - "8501:8501"
+    environment:
+      PYTHONPATH: /opt/airflow
+      ENV_FOR_DYNACONF: local
+      DYNACONF_DATABASE__HOST: operational-postgres
+      DYNACONF_DATABASE__PORT: "5432"
+      DYNACONF_DATABASE__NAME: event_platform
+      DYNACONF_DATABASE__USER: postgres
+      DYNACONF_DATABASE__PASSWORD: postgres
+      DYNACONF_STORAGE__BASE_PATH: /opt/airflow/data/lakehouse
+    volumes:
+      - ./reporting:/opt/airflow/reporting
+      - ./config:/opt/airflow/config
+      - ./src:/opt/airflow/src
+      - ./data:/opt/airflow/data
+    command: streamlit run /opt/airflow/reporting/sales_report_dashboard.py
+    networks:
+      - etl_net
+    depends_on:
+      operational-postgres:
+        condition: service_healthy
+
+
+volumes:
+  airflow_postgres_data:
+  operational_postgres_data:
+  airflow_logs:
+  airflow_ivy_cache:
+
+networks:
+  etl_net:
+    driver: bridge
