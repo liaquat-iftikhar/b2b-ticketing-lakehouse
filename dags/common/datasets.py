@@ -1,0 +1,33 @@
+from airflow.sdk.definitions.asset import Dataset
+
+RESELLER_SALE_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(
+    "org.iftikhar.com/reseller_sale_data_extractor_dag/success"
+)
+ORGANIZER_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(
+    "org.iftikhar.com/organizer_data_extractor_dag/success"
+)
+SALE_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(
+    "org.iftikhar.com/sale_data_extractor_dag/success"
+)
+CUSTOMER_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(
+    "org.iftikhar.com/customer_data_extractor_dag/success"
+)
+RESELLER_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(
+    "org.iftikhar.com/reseller_data_extractor_dag/success"
+)
+COMMISSION_AGREEMENT_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(
+    "org.iftikhar.com/commission_agreement_data_extractor_dag/success"
+)
+EVENT_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(
+    "org.iftikhar.com/event_data_extractor_dag/success"
+)
+TICKET_DATA_EXTRACTOR_DAG_SUCCESS_DATASET = Dataset(
+    "org.iftikhar.com/ticket_data_extractor_dag/success"
+)
+SALES_REPORT_DAG_SUCCESS_DATASET = Dataset("org.iftikhar.com/sales_report_dag/success")
+OPERATIONAL_DB_DATA_LOADER_DAG_SUCCESS_DATASET = Dataset(
+    "org.iftikhar.com/operational_db_data_loader/success"
+)
+RESELLER_VENDOR_DATA_LOADER_DAG_SUCCESS_DATASET = Dataset(
+    "org.iftikhar.com/reseller_vendor_data_loader/success"
+)
