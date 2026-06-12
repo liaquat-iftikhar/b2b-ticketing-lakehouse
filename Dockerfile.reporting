@@ -1,0 +1,28 @@
+FROM python:3.11-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements-reporting.txt .
+RUN pip install --no-cache-dir -r requirements-reporting.txt
+
+COPY reporting/ ./reporting/
+COPY src/config/ ./src/config/
+COPY config/     ./config/
+
+ENV PYTHONPATH=/app
+ENV ENV_FOR_DYNACONF=local
+
+ENV STREAMLIT_SERVER_PORT=8501
+ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+EXPOSE 8501
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:8501/_stcore/health || exit 1
+
+CMD ["streamlit", "run", "reporting/sales_report_dashboard.py"]

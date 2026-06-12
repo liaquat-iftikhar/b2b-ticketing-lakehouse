@@ -1,0 +1,33 @@
+FROM apache/airflow:3.2.2
+
+USER root
+
+RUN mkdir -p /usr/share/man/man1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       openjdk-17-jdk-headless \
+    && apt-get autoremove -yqq --purge \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Stable symlink so JAVA_HOME doesn't depend on the exact JDK sub-directory name
+RUN ln -sf "$(ls -d /usr/lib/jvm/java-17-openjdk-* | head -1)" \
+        /usr/lib/jvm/java-17-default
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-default
+
+USER airflow
+
+COPY requirements-airflow.txt /home/airflow/requirements-airflow.txt
+RUN pip install --no-cache-dir --user -r /home/airflow/requirements-airflow.txt
+
+RUN ln -sf \
+        "$(python3 -c 'import pyspark, os; print(os.path.dirname(pyspark.__file__))')" \
+        /home/airflow/spark_home
+
+ENV SPARK_HOME=/home/airflow/spark_home
+ENV PYSPARK_PYTHON=/usr/local/bin/python3
+ENV PYSPARK_DRIVER_PYTHON=/usr/local/bin/python3
+
+ENV PATH="${JAVA_HOME}/bin:${SPARK_HOME}/bin:/home/airflow/.local/bin:${PATH}"
